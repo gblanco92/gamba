@@ -1,0 +1,8 @@
+x,y,z,t,u,v
+32003
+x+y+z+t+u+v,
+x*y+y*z+z*t+t*u+u*v+v*x,
+x*y*z+y*z*t+z*t*u+t*u*v+u*v*x+v*x*y,
+x*y*z*t+y*z*t*u+z*t*u*v+t*u*v*x+u*v*x*y+v*x*y*z,
+x*y*z*t*u+y*z*t*u*v+z*t*u*v*x+t*u*v*x*y+u*v*x*y*z+v*x*y*z*t,
+x*y*z*t*u*v-1

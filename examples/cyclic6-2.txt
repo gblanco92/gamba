@@ -1,0 +1,8 @@
+a,b,c,d,e,f,
+3
+a+b+c+d+e+f,
+a*b+b*c+c*d+d*e+e*f+f*a,
+a*b*c+b*c*d+c*d*e+d*e*f+e*f*a+f*a*b,
+a*b*c*d+b*c*d*e+c*d*e*f+d*e*f*a+e*f*a*b+f*a*b*c,
+a*b*c*d*e+b*c*d*e*f+c*d*e*f*a+d*e*f*a*b+e*f*a*b*c+f*a*b*c*d,
+a*b*c*d*e*f-1

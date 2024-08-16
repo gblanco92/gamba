@@ -1,0 +1,12 @@
+a,b,c,d,e,f,g,h,i,j
+32003,
+a+b+c+d+e+f+g+h+i+j,
+a*b+b*c+c*d+d*e+e*f+f*g+g*h+h*i+i*j+j*a,
+a*b*c+b*c*d+c*d*e+d*e*f+e*f*g+f*g*h+g*h*i+h*i*j+i*j*a+j*a*b,
+a*b*c*d+b*c*d*e+c*d*e*f+d*e*f*g+e*f*g*h+f*g*h*i+g*h*i*j+h*i*j*a+i*j*a*b+j*a*b*c,
+a*b*c*d*e+b*c*d*e*f+c*d*e*f*g+d*e*f*g*h+e*f*g*h*i+f*g*h*i*j+g*h*i*j*a+h*i*j*a*b+i*j*a*b*c+j*a*b*c*d,
+a*b*c*d*e*f+b*c*d*e*f*g+c*d*e*f*g*h+d*e*f*g*h*i+e*f*g*h*i*j+f*g*h*i*j*a+g*h*i*j*a*b+h*i*j*a*b*c+i*j*a*b*c*d+j*a*b*c*d*e,
+a*b*c*d*e*f*g+b*c*d*e*f*g*h+c*d*e*f*g*h*i+d*e*f*g*h*i*j+e*f*g*h*i*j*a+f*g*h*i*j*a*b+g*h*i*j*a*b*c+h*i*j*a*b*c*d+i*j*a*b*c*d*e+j*a*b*c*d*e*f,
+a*b*c*d*e*f*g*h+b*c*d*e*f*g*h*i+c*d*e*f*g*h*i*j+d*e*f*g*h*i*j*a+e*f*g*h*i*j*a*b+f*g*h*i*j*a*b*c+g*h*i*j*a*b*c*d+h*i*j*a*b*c*d*e+i*j*a*b*c*d*e*f+j*a*b*c*d*e*f*g,
+a*b*c*d*e*f*g*h*i+b*c*d*e*f*g*h*i*j+c*d*e*f*g*h*i*j*a+d*e*f*g*h*i*j*a*b+e*f*g*h*i*j*a*b*c+f*g*h*i*j*a*b*c*d+g*h*i*j*a*b*c*d*e+h*i*j*a*b*c*d*e*f+i*j*a*b*c*d*e*f*g+j*a*b*c*d*e*f*g*h,
+a*b*c*d*e*f*g*h*i*j-1

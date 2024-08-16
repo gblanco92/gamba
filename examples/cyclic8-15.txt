@@ -1,0 +1,10 @@
+a,b,c,d,e,f,g,h
+32003
+a+b+c+d+e+f+g+h,
+a*b+a*h+b*c+c*d+d*e+e*f+f*g+g*h,
+a*b*c+a*b*h+a*g*h+b*c*d+c*d*e+d*e*f+e*f*g+f*g*h,
+a*b*c*d+a*b*c*h+a*b*g*h+a*f*g*h+b*c*d*e+c*d*e*f+d*e*f*g+e*f*g*h,
+a*b*c*d*e+a*b*c*d*h+a*b*c*g*h+a*b*f*g*h+a*e*f*g*h+b*c*d*e*f+c*d*e*f*g+d*e*f*g*h,
+a*b*c*d*e*f+a*b*c*d*e*h+a*b*c*d*g*h+a*b*c*f*g*h+a*b*e*f*g*h+a*d*e*f*g*h+b*c*d*e*f*g+c*d*e*f*g*h,
+a*b*c*d*e*f*g+a*b*c*d*e*f*h+a*b*c*d*e*g*h+a*b*c*d*f*g*h+a*b*c*e*f*g*h+a*b*d*e*f*g*h+a*c*d*e*f*g*h+b*c*d*e*f*g*h,
+a*b*c*d*e*f*g*h-1

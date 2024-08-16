@@ -1,0 +1,48 @@
+# Cyclic-n
+cyclic9-15
+cyclic9-31
+cyclic10-15
+cyclic10-31
+
+# Katsura-n
+kat14-15
+kat14-31
+kat15-15
+kat15-31
+
+# Eco-n
+eco14-15
+eco14-31
+eco15-15
+eco15-31
+
+# Noon-n
+noon8-15
+noon8-31
+noon9-15
+noon9-31
+
+# Critical points
+cp_d_4_n_9_p_9-15
+cp_d_4_n_9_p_9-31
+cp_d_4_n_10_p_10-15
+cp_d_4_n_10_p_10-31
+
+# Reimer-n
+reimer8-15
+reimer8-31
+reimer9-15
+reimer9-31
+
+# Minrank
+minrank_d_2_p_2_q_13_r_2-15
+minrank_d_2_p_2_q_13_r_2-31
+minrank_d_3_p_2_q_9_r_2-15
+minrank_d_3_p_2_q_9_r_2-31
+
+# Other
+bayes148-15
+game2-15
+jason210-15
+mayr42-15
+yang1-15

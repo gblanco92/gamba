@@ -1,0 +1,6 @@
+a,b,c,d,
+65521
+a+b+c+d,
+a*b+b*c+c*d+d*a,
+a*b*c+b*c*d+c*d*a+d*a*b,
+a*b*c*d-1
