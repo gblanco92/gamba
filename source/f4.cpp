@@ -14,56 +14,113 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
-#include <format>
-#include <iostream>
+#include "f4.hpp"
 
-#include "getRSS.hpp"
+#include "logger.hpp"
 
 namespace gamba
 {
 
+#ifndef GAMBA_UNITY_BUILD
+extern template class polynomial_basis<uint8_t>;
+extern template class polynomial_basis<uint16_t>;
+extern template class polynomial_basis<uint32_t>;
+
+extern template class linalg_v3<uint8_t>;
+extern template class linalg_v3<uint16_t>;
+extern template class linalg_v3<uint32_t>;
+
+extern template void update_f4<order_grevlex>(spair_set& spairs,
+                                              base_polynomial_basis& basis,
+                                              size_t const prev_num_gens);
+// extern template void update_f4<order_lexic>(spair_set& spairs,
+//                                             base_polynomial_basis& basis,
+//                                             size_t const prev_num_gens);
+extern template void update_f4<order_blockelim>(spair_set& spairs,
+                                                base_polynomial_basis& basis,
+                                                size_t const prev_num_gens);
+
+extern template class std::pair<size_t, size_t> select_spairs<order_grevlex>(
+    spair_set& spairs);
+// extern template class std::pair<size_t, size_t> select_spairs<order_lexic>(
+//     spair_set& spairs);
+extern template class std::pair<size_t, size_t> select_spairs<order_blockelim>(
+    spair_set& spairs);
+
+extern template void reduce<order_grevlex, uint8_t>(
+    polynomial_basis<uint8_t>& basis,
+    matrix_f4& matrix);
+extern template void reduce<order_grevlex, uint16_t>(
+    polynomial_basis<uint16_t>& basis,
+    matrix_f4& matrix);
+extern template void reduce<order_grevlex, uint32_t>(
+    polynomial_basis<uint32_t>& basis,
+    matrix_f4& matrix);
+
+// extern template void reduce<order_lexic, uint8_t>(
+//      polynomial_basis<uint8_t>& basis,
+//      matrix_f4& matrix);
+// extern template void reduce<order_lexic, uint16_t>(
+//      polynomial_basis<uint16_t>& basis,
+//      matrix_f4& matrix);
+// extern template void reduce<order_lexic, uint32_t>(
+//      polynomial_basis<uint32_t>& basis,
+//      matrix_f4& matrix);
+
+extern template void reduce<order_blockelim, uint8_t>(
+    polynomial_basis<uint8_t>& basis,
+    matrix_f4& matrix);
+extern template void reduce<order_blockelim, uint16_t>(
+    polynomial_basis<uint16_t>& basis,
+    matrix_f4& matrix);
+extern template void reduce<order_blockelim, uint32_t>(
+    polynomial_basis<uint32_t>& basis,
+    matrix_f4& matrix);
+
+template void f4_main<order_grevlex, uint8_t>(
+    polynomial_basis<uint8_t>& basis);  // NOFORMAT
+template void f4_main<order_grevlex, uint16_t>(
+    polynomial_basis<uint16_t>& basis);
+template void f4_main<order_grevlex, uint32_t>(
+    polynomial_basis<uint32_t>& basis);
+
+// template void f4_main<order_lexic, uint8_t>(
+//   polynomial_basis<uint8_t>& basis);
+// template void f4_main<order_lexic, uint16_t>(
+//   polynomial_basis<uint16_t>& basis);
+// template void f4_main<order_lexic, uint32_t>(
+//   polynomial_basis<uint32_t>& basis);
+
+template void f4_main<order_blockelim, uint8_t>(
+    polynomial_basis<uint8_t>& basis);
+template void f4_main<order_blockelim, uint16_t>(
+    polynomial_basis<uint16_t>& basis);
+template void f4_main<order_blockelim, uint32_t>(
+    polynomial_basis<uint32_t>& basis);
+#endif
+
+namespace f4
+{
+
 void print_column_names()
 {
-    std::cout << std::endl;
-    std::cout << std::format("{}{:>12}{:>18}{:>15}{:>20}{:>19}{:>14}{:>14}",
-                             "deg", "spairs", "matrix", "density", "new gens",
-                             "ech. time", "mem. usage", "total time")
-              << std::endl;
-    std::cout << "---------------------------------------------------------";
-    std::cout << "----------------------------------------------------------"
-              << std::endl;
-}
+    log::print(log::INFO2, "\n┌{0:─^118}┐\n", "");
 
-void print_memory_usage(double const mem_usage)
-{
-    if (mem_usage < 1024.0)
-        std::cout << std::format("{:10.2f} MiB", mem_usage);
-    else
-        std::cout << std::format("{:10.2f} GiB", mem_usage / 1024.0);
-}
+    log::print(log::INFO2, "│ {}{:>12}{:>19}{:>15}{:>20}{:>19}{:>14}{:>17}",
+               "deg", "spairs", "matrix", "density", "new gens", "ech. time",
+               "mem. usage", "total time │\n");
 
-void print_memory_usage()
-{
-    /* get peak RSS memory usage in mebibytes */
-    double const mem_usage =
-        static_cast<double>(getPeakRSS()) / 1024.0 / 1024.0;
-
-    print_memory_usage(mem_usage);
-}
-
-void print_time(std::chrono::duration<double> const time, bool const new_line)
-{
-    std::cout << std::format("{:10.2f} sec", time.count()) << std::flush;
-
-    if (new_line)
-        std::cout << std::endl;
+    log::print(log::INFO2, "├{:─^118}┤\n", "");
 }
 
 void print_bottom_line()
 {
-    std::cout << "=========================================================";
-    std::cout << "=========================================================="
-              << std::endl;
+    if (params::no_reduce)
+        log::print(log::INFO2, "╘{:═^118}╛\n", "");
+    else
+        log::print(log::INFO2, "╞{:═^118}╡\n", "");
 }
+
+}  // namespace f4
 
 }  // namespace gamba

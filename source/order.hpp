@@ -29,8 +29,8 @@ struct order_grevlex
 
     /* comparators return a signed type so negation for reverse sorting works */
     template <class MonomialType>
-    constexpr int32_t operator()(MonomialType const& lhs,
-                                 MonomialType const& rhs) const
+    constexpr static int32_t operator()(MonomialType const lhs,
+                                        MonomialType const rhs)
     {
         auto const degl = degree(lhs);
         auto const degr = degree(rhs);
@@ -51,8 +51,7 @@ struct order_grevlex
     }
 
     template <class MonomialType>
-    constexpr static auto degree(MonomialType const& mon)
-        -> MonomialType::exponent_type
+    constexpr static uint32_t degree(MonomialType const mon)
     {
         return mon.cbegin()[0];
     }
@@ -61,16 +60,14 @@ struct order_grevlex
     {
         return num_vars + 1;
     }
-
-    static inline size_t block_size{0};
 };
 
 /* lexicographical order */
 struct order_lexic
 {
     template <class MonomialType>
-    constexpr int32_t operator()(MonomialType const& lhs,
-                                 MonomialType const& rhs) const
+    constexpr static int32_t operator()(MonomialType const lhs,
+                                        MonomialType const rhs)
     {
         auto const* const expl = lhs.cbegin();
         auto const* const expr = rhs.cbegin();
@@ -83,8 +80,7 @@ struct order_lexic
     }
 
     template <class MonomialType>
-    constexpr static auto degree(MonomialType const& mon)
-        -> MonomialType::exponent_type
+    constexpr static uint32_t degree(MonomialType const mon)
     {
         return mon.cbegin()[0];
     }
@@ -93,8 +89,6 @@ struct order_lexic
     {
         return num_vars + 1;
     }
-
-    static inline size_t block_size{0};
 };
 
 /* two blocks degree reverse lexicographical order */
@@ -105,9 +99,13 @@ struct order_blockelim
     using block_order   = void;
 
     template <class MonomialType>
-    constexpr int32_t operator()(MonomialType const& lhs,
-                                 MonomialType const& rhs) const
+    constexpr static int32_t operator()(MonomialType const lhs,
+                                        MonomialType const rhs)
     {
+        using monomial_type = MonomialType;
+
+        size_t const ebz = monomial_type::block_size;
+
         auto const* const expl = lhs.cbegin();
         auto const* const expr = rhs.cbegin();
 
@@ -121,7 +119,7 @@ struct order_blockelim
             return 1;
 
         size_t i;
-        for (i = block_size - 1; i > 0 and expl[i] == expr[i]; --i)
+        for (i = ebz - 1; i > 0 and expl[i] == expr[i]; --i)
             ;
 
         if (i != 0)
@@ -131,8 +129,8 @@ struct order_blockelim
         }
 
         /* second block */
-        auto const deg2l = expl[block_size];
-        auto const deg2r = expr[block_size];
+        auto const deg2l = expl[ebz];
+        auto const deg2r = expr[ebz];
 
         if (deg2l < deg2r)
             return -1;
@@ -146,20 +144,16 @@ struct order_blockelim
     }
 
     template <class MonomialType>
-    constexpr static auto degree(MonomialType const& mon)
-        -> MonomialType::exponent_type
+    constexpr static uint32_t degree(MonomialType const mon)
     {
         auto const* const exp = mon.cbegin();
-        return (exp[0] + exp[block_size]);
+        return (exp[0] + exp[MonomialType::block_size]);
     }
 
     constexpr static size_t exponent_size(size_t const num_vars)
     {
         return num_vars + 2;
     }
-
-    /* number of elimination variables + degree of the block */
-    static inline size_t block_size{};
 };
 
 template <class, class = void>

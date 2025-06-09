@@ -16,48 +16,37 @@
 
 #pragma once
 
-#include "io.hpp"
-
 namespace gamba
 {
 
-enum class order_options
+struct params
 {
-    grevlex,
-    lexic,
-    blockelim
+    enum class order  // NOLINT
+    {
+        grevlex,
+        lexic,
+        blockelim
+    };
+
+    static void sanitize_input(size_t const num_vars);
+
+    /* GamBa parameters */
+
+    static bool all_spairs;
+
+    static ssize_t max_spairs;
+
+    static order mon_order;
+
+    static size_t num_elim_vars;
+
+    static size_t num_threads;
+
+    static bool no_reduce;
+
+    static size_t seed;
+
+    static ssize_t verbose;
 };
-
-struct gamba_params
-{
-    bool all_spairs{false};
-
-    ssize_t max_spairs{2'000L};
-
-    order_options mon_order{order_options::grevlex};
-
-    static std::map<std::string, order_options> mon_order_map;
-
-    size_t num_elim_vars{0UL};
-
-    size_t num_threads{1UL};
-
-    bool no_reduce{false};
-
-    size_t seed{967'557'673UL};
-
-    size_t verbose{2};
-
-    bool basis_info{true};
-
-    bool rounds_info{true};
-
-    bool stats_info{true};
-
-    bool timings_info{true};
-};
-
-void check_gamba_parameters(gamba_params& params,
-                            generators_data const& input_data);
 
 }  // namespace gamba

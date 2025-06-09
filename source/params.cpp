@@ -16,41 +16,48 @@
 
 #include "params.hpp"
 
+#include "utils.hpp"
+
 namespace gamba
 {
 
-std::map<std::string, order_options> gamba_params::mon_order_map = {
-    {  "grevlex",   order_options::grevlex},
-    {    "lexic",     order_options::lexic},
-    {"blockelim", order_options::blockelim}
-};
+bool params::all_spairs{false};
 
-void check_gamba_parameters(gamba_params& params,
-                            generators_data const& input_data)
+ssize_t params::max_spairs{2'000L};
+
+params::order params::mon_order{params::order::grevlex};
+
+size_t params::num_elim_vars{0UL};
+
+size_t params::num_threads{1UL};
+
+bool params::no_reduce{false};
+
+GAMBA_RELEASE(size_t params::seed = std::random_device{}();)
+
+GAMBA_DEVELOP(size_t params::seed{967'557'673UL};)
+
+ssize_t params::verbose{2};
+
+void params::sanitize_input(size_t const num_vars)
 {
     /* zero means taking all the spairs with same degree */
-    if (params.max_spairs == 0UL)
+    if (params::max_spairs == 0UL)
     {
-        params.max_spairs = std::numeric_limits<ssize_t>::max();
+        params::max_spairs = std::numeric_limits<ssize_t>::max();
     }
 
     /* validate num_elim_vars & set monomial order */
-    if (params.num_elim_vars != 0)
+    if (params::num_elim_vars != 0)
     {
-        if (params.num_elim_vars >= input_data.num_vars)
+        if (params::num_elim_vars >= num_vars)
         {
             throw std::runtime_error("Elimination block size must be "
                                      "smaller than the number of variables.");
         }
 
-        params.mon_order = order_options::blockelim;
+        params::mon_order = order::blockelim;
     }
-
-    /* select what information to display depending on verbosity level */
-    params.basis_info   = params.verbose > 0;
-    params.rounds_info  = params.verbose > 1;
-    params.timings_info = params.verbose > 0;
-    params.stats_info   = params.verbose > 0;
 }
 
 }  // namespace gamba

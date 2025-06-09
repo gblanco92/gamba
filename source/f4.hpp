@@ -18,55 +18,43 @@
 
 #include <chrono>
 
-namespace gamba
-{
-
-void print_column_names();
-
-void print_time(std::chrono::duration<double> const round_time,
-                bool const new_line = false);
-
-void print_memory_usage(double const mem_usage);
-
-void print_memory_usage();
-
-void print_bottom_line();
-
-}  // namespace gamba
-
+#include "basis.hpp"
 #include "linalg_v3.hpp"
 #include "matrix.hpp"
-#include "params.hpp"
 #include "reduce.hpp"
-#include "spair.hpp"
 #include "update.hpp"
 
 namespace gamba
 {
 
-template <class CoefficientType, class MonomialOrder>
-void f4_main(polynomial_basis<CoefficientType, MonomialOrder>& basis,
-             gamba_params const& params)
+namespace f4
+{
+
+void print_column_names();
+
+void print_bottom_line();
+
+}  // namespace f4
+
+template <class MonomialOrder, class CoefficientType>
+void f4_main(polynomial_basis<CoefficientType>& basis)
 {
     using coefficient_type = CoefficientType;
     using monomial_order   = MonomialOrder;
-    using matrix_type      = matrix_f4<coefficient_type, monomial_order>;
-    using linalg_type      = linalg_v3<coefficient_type, monomial_order>;
-    using spair_set_type   = spair_set<monomial_order>;
+    using linalg_type      = linalg_v3<coefficient_type>;
 
-    spair_set_type spairs;
+    spair_set spairs;
 
     /* generate first spairs and update redundant basis elements */
-    update_f4(spairs, basis, 0);
+    update_f4<monomial_order>(spairs, basis, 0);
 
     /* reuse allocated memory in matrix across rounds */
-    matrix_type matrix{basis};
+    matrix_f4 matrix{basis};
 
     /* reuse allocated memory in linear algebra across rounds */
-    linalg_type echelon_engine3{basis.field, params.seed};
+    linalg_type echelon_engine3{basis.field};
 
-    if (params.rounds_info)
-        print_column_names();
+    f4::print_column_names();
 
     /* main f4 loop */
     while (not spairs.queue.empty())
@@ -76,57 +64,53 @@ void f4_main(polynomial_basis<CoefficientType, MonomialOrder>& basis,
 
         size_t const prev_num_gens = basis.num_gens();
 
-        auto const [spair_range, round_degree] = select_spairs(spairs, params);
+        auto const [num_spairs, round_degree] =
+            select_spairs<monomial_order>(spairs);
 
         // print_memory_usage(spairs.memory_usage());
 
-        matrix.insert_spairs(spairs, spair_range, basis);
+        matrix.insert_spairs(spairs, num_spairs, basis);
 
         matrix.symbolic_preprocessing(basis);
 
-        matrix.convert_monomials_to_columns(params);
+        matrix.convert_monomials_to_columns(monomial_order{});
 
         // print_memory_usage(matrix.memory_usage());
 
         echelon_engine3.initialize(matrix);
 
-        auto const echl_time = echelon_engine3.reduce(params);
+        auto const echl_time = echelon_engine3.reduce();
 
         // print_memory_usage(echelon_engine3.memory_usage());
 
-        if (params.rounds_info)
-            print_time(echl_time);
+        print_time(echl_time);
 
-        matrix.extract_new_rows(echelon_engine3);
+        echelon_engine3.extract_new_rows(matrix);
 
-        basis.insert_new_rows_echelon(matrix);
+        basis.insert_new_rows_echelon(matrix, monomial_order{});
 
         // print_memory_usage(basis.memory_usage());
 
-        update_f4(spairs, basis, prev_num_gens);
+        update_f4<monomial_order>(spairs, basis, prev_num_gens);
 
         /* timings */
         auto const end_walltime = std::chrono::system_clock::now();
 
-        if (params.rounds_info)
-        {
-            print_memory_usage();
+        print_memory_usage();
 
-            print_time(end_walltime - start_walltime, /* new_line = */ true);
-        }
+        print_time(end_walltime - start_walltime, /* new_line = */ true);
 
         if (basis.is_trivial())
             break;
     }
 
-    if (params.rounds_info)
-        print_bottom_line();
+    f4::print_bottom_line();
 
     basis.remove_redundant_gens();
 
     /* matrix has been cleared by basis */
-    if (not params.no_reduce)
-        reduce(basis, matrix, params);
+    if (not params::no_reduce)
+        reduce<monomial_order>(basis, matrix);
 }
 
 }  // namespace gamba

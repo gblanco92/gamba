@@ -21,9 +21,29 @@
 #include <numeric>
 #include <vector>
 
-#include "config.hpp"
+#include "logger.hpp"
 
-#ifdef DEBUG
+#ifdef DEBUG_GAMBA
+#    define GAMBA_DEBUG(code) code
+#else
+#    define GAMBA_DEBUG(code)
+#endif
+
+#ifdef RELEASE_GAMBA
+#    define GAMBA_RELEASE(code) code
+#    define GAMBA_DEVELOP(code)
+#else
+#    define GAMBA_DEVELOP(code) code
+#    define GAMBA_RELEASE(code)
+#endif
+
+#ifdef PROFILE_GAMBA
+#    define GAMBA_PROFILE(code) code
+#else
+#    define GAMBA_PROFILE(code)
+#endif
+
+#ifdef DEBUG_GAMBA
 #    define FORCE_INLINE inline
 #else
 #    define FORCE_INLINE inline __attribute__((__always_inline__))
@@ -171,14 +191,12 @@ struct buffer_row_wrapper
         return *this->m_idx > *other.m_idx;
     }
 
-    static inline size_t size;
-
     value_type* m_ptr;
     index_type* m_idx;
 };
 
 /* swap two (strided) rows of a linear algebra buffer in place */
-template <class ValueType>
+template <size_t NUM_ROWS_BUFFER, class ValueType>
 void swap_buffer_rows(ValueType* lhs_buffer,
                       size_t const lhs_idx,
                       ValueType* rhs_buffer,
@@ -214,29 +232,66 @@ void swap_buffer_rows(ValueType* lhs_buffer,
     }
 }
 
-template <class ValueType, class IndexType, size_t StrideOffset>
+template <size_t NUM_ROWS_BUFFER,
+          class ValueType,
+          class IndexType,
+          size_t StrideOffset>
 void swap(buffer_row_wrapper<ValueType, IndexType, StrideOffset>& lhs,
-          buffer_row_wrapper<ValueType, IndexType, StrideOffset>& rhs) noexcept
+          buffer_row_wrapper<ValueType, IndexType, StrideOffset>& rhs,
+          size_t const size) noexcept
 {
-    using row_type = buffer_row_wrapper<ValueType, IndexType, StrideOffset>;
-
-    swap_buffer_rows(lhs.m_ptr, 0, rhs.m_ptr, 0, row_type::size);
+    swap_buffer_rows<NUM_ROWS_BUFFER>(lhs.m_ptr, 0, rhs.m_ptr, 0, size);
 
     std::iter_swap(lhs.m_idx, rhs.m_idx);
 }
 
+/* returns memory footprint of vector in megabytes */
 template <class T, class Allocator>
 double memory_size(std::vector<T, Allocator> const& v)
 {
-    /* return memory footprint of vector in megabytes */
     return static_cast<double>(v.capacity() * sizeof(T)) / 1024.0 / 1024.0;
 }
 
+/* returns memory footprint of span in megabytes */
 template <class T>
 double memory_size(std::span<T> const& v)
 {
-    /* return memory footprint of span in megabytes */
     return static_cast<double>(v.size() * sizeof(T)) / 1024.0 / 1024.0;
 }
+
+std::string compiler_version_string();
+
+std::string libgmp_version_string();
+
+std::string libflint_version_string();
+
+void print_memory_usage(double const mem_usage);
+
+void print_memory_usage();
+
+void print_time(std::chrono::duration<double> const time,
+                bool const new_line = false);
+
+#if defined(DEBUG_GAMBA) \
+    && (defined(__linux__) || defined(__linux) || defined(linux))
+/* checks whether transparent huge pages have been allocated */
+static inline void check_smaps_file()
+{
+    std::ifstream smaps_file("/proc/self/smaps");
+    std::array<char, 4'096> line_buffer{};
+
+    while (smaps_file.good())
+    {
+        smaps_file.getline(line_buffer.data(), line_buffer.size(), '\n');
+
+        std::string_view line{line_buffer.data()};
+
+        if (line.starts_with("AnonHugePages:") && !line.contains(" 0 kB"))
+            log::print(log::DEBG, "{}\n", line);
+    }
+
+    smaps_file.close();
+}
+#endif
 
 }  // namespace gamba

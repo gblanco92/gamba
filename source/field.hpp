@@ -21,6 +21,7 @@
 #include <concepts>
 #include <type_traits>
 
+#include <flint/ulong_extras.h>
 #include <gmpxx.h>
 
 #include "montgomery.hpp"
@@ -35,29 +36,32 @@ struct field_traits;
 template <std::unsigned_integral UIntT>
 struct field_traits<UIntT>
 {
-    using integer_type  = UIntT;
-    using next_int_type = next_size_t<integer_type>;
+    using integer_type = UIntT;
 
-    /* montgomery_type is either uint32_t or uint64_t */
-    using montgomery_type =
-        std::conditional_t<std::is_same_v<integer_type, uint32_t>,
-                           uint64_t,
-                           uint32_t>;
+    // clang-format off
 
-    /* if integer_type = uint16_t or uint8_t --> r = 2^32;
-       if integer_type = uint32_t            --> r = 2^64 */
+    template <class T> struct montgomery_{ using type = T; };
+    template <> struct montgomery_<uint8_t> { using type = uint32_t; };
+    template <> struct montgomery_<uint16_t> { using type = uint32_t; };
+    template <> struct montgomery_<uint32_t> { using type = uint64_t; };
+
+    // clang-format on
+
+    using montgomery_type = montgomery_<integer_type>::type;
+
+    /* if montgomery_type = uint32_t  --> r = 2^32;
+       if montgomery_type = uint64_t  --> r = 2^64 */
     static constexpr size_t const r_nbits = CHAR_BIT * sizeof(montgomery_type);
-    static constexpr size_t const r_log2_nbits = std::bit_width(r_nbits) - 1;
     static constexpr auto const r_const = static_cast<uint128_t>(1) << r_nbits;
 
     /* computes the inverse of x mod 2^r_nbits */
     static constexpr montgomery_type inverse_mod2(montgomery_type const x)
     {
-        montgomery_type xr{1};
+        constexpr size_t const r_log2_nbits = std::bit_width(r_nbits) - 1;
+
+        montgomery_type xr = 1;
         for (size_t i = 0; i < r_log2_nbits; ++i)
-        {
             xr *= 2U - x * xr;
-        }
 
         return xr;
     }
@@ -67,81 +71,68 @@ struct field_traits<UIntT>
 
             r{static_cast<integer_type>(r_const % n)},
 
-            r2{static_cast<integer_type>(static_cast<next_int_type>(r) * r
-                                         % n)},
+            r2{static_cast<integer_type>(n_powmod2(r, 2, n))},
 
-            r3{static_cast<integer_type>(static_cast<next_int_type>(r2) * r
-                                         % n)},
+            r4{static_cast<integer_type>(n_powmod2(r, 4, n))},
 
-            r4{static_cast<integer_type>(static_cast<next_int_type>(r2) * r2
-                                         % n)},
-
-            nr{inverse_mod2(n)},
-
-            /* we are adding elements in the range [0, 2*n^2) while the sum is
-               < n * r, hence the sum can have at most (r / 2 / n) terms */
-            max_fma{static_cast<size_t>(r_const / 2U / n)}
+            /* do not use FLINT's ulong functions since FLINT_BITS < 63 */
+            nr{inverse_mod2(n)}
     {
         assert(_n < r_const);
         assert((static_cast<uint64_t>(nr) * n) % r_const == 1);
-    }
 
-    /* computes the inverse of x mod n */
-    integer_type inverse(integer_type const _x) const
-    {
-        using signed_next_type = std::make_signed_t<next_int_type>;
+        /* we add elements in the range [0, 2*n^2) while the sum is < n * r;
+         * montgomery_max_fma >= 2^32 / 2 / 65521 = 32775 */
+        size_t const montgomery_max_fma = r_const / 2U / n;
 
-        assert(_x % n != 0);
+        size_t float_max_fma = std::numeric_limits<size_t>::max();  // infinity
 
-        signed_next_type t;
-        signed_next_type q;
-        signed_next_type x0 = 0;
-        signed_next_type x1 = 1;
+        /* we add elements in the range [0, 2*n^2) while the sum is < 2^52;
+         * float_max_fma >= 2^52 / 2 / 65521^2 = 524'528 */
+        if constexpr (not std::is_same_v<integer_type, uint32_t>)
+            float_max_fma = (1UL << 52) / (2U * n * n);
+        /* AVX2 magic constant trick only works if < 2^52 */
 
-        auto n1 = static_cast<signed_next_type>(n);
-        auto x  = static_cast<signed_next_type>(_x);
+        max_fma = std::min(montgomery_max_fma, float_max_fma);
 
-        while (x > 1)
-        {
-            q  = x / n1;
-            t  = n1;
-            n1 = x % n1;
-            x  = t;
-            t  = x0;
-            x0 = x1 - static_cast<signed_next_type>(q * x0);
-            x1 = t;
-        }
-
-        if (x1 < 0)
-        {
-            x1 += static_cast<signed_next_type>(n);
-        }
-
-        return static_cast<integer_type>(x1);
+        /* force low max_fma during testing */
+        GAMBA_DEBUG(max_fma = 25);
     }
 
     integer_type add(integer_type const x, integer_type const y) const
     {
-        auto const sum =
-            (static_cast<next_int_type>(x) + y) % static_cast<next_int_type>(n);
+        auto const sum = n_addmod(x, y, n);
 
         return static_cast<integer_type>(sum);
     }
 
     integer_type multiply(integer_type const x, integer_type const y) const
     {
-        auto const prod =
-            (static_cast<next_int_type>(x) * y) % static_cast<next_int_type>(n);
+        auto const prod = n_mulmod2(x, y, n);
 
         return static_cast<integer_type>(prod);
     }
 
-    /* Return uint32_t to avoid overflow when n has exactly 16 bits */
+    integer_type inverse(integer_type const x) const
+    {
+        auto const inv = n_invmod(x, n);
+
+        return static_cast<integer_type>(inv);
+    }
+
+    integer_type modular_reduce(mpz_class const& x) const
+    {
+        ulong const res = mpz_fdiv_ui(x.get_mpz_t(), n);
+
+        return static_cast<integer_type>(res);
+    }
+
+    /* returns uint32_t to avoid overflow when 'n' has *exactly* 16 bits */
     uint32_t reduce(uint64_t const x) const
     {
         auto const res = montgomery<montgomery_type>::reduce(x, n, nr);
 
-        /* WARNING: this can overflow if coeff_type == uint32_t && n > 2^31 */
+        /* WARNING: can overflow if coeff_type == uint32_t && n > 2^31 */
         return static_cast<uint32_t>(res);
     }
 
@@ -170,9 +161,6 @@ struct field_traits<UIntT>
     /* r^2 modulo n */
     integer_type const r2;
 
-    /* r^3 modulo n */
-    integer_type const r3;
-
     /* r^4 modulo n */
     integer_type const r4;
 
@@ -180,23 +168,25 @@ struct field_traits<UIntT>
     montgomery_type const nr;
 
     /* number of terms we can accumulate before a modular reduction */
-    size_t const max_fma;
+    size_t max_fma;
 };
 
 template <>
-struct field_traits<mpz_class>
+struct field_traits<mpq_class>
 {
     explicit field_traits([[maybe_unused]] uint32_t const n) { assert(n == 0); }
 
-    static mpz_class add(mpz_class const& x, mpz_class const& y)
+    static mpq_class add(mpq_class const& x, mpq_class const& y)
     {
         return x + y;
     }
 
-    static mpz_class multiply(mpz_class const& x, mpz_class const& y)
+    static mpq_class multiply(mpq_class const& x, mpq_class const& y)
     {
         return x * y;
     }
+
+    static mpq_class inverse(mpq_class const& x) { return 1 / x; }
 };
 
 }  // namespace gamba

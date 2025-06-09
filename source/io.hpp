@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <cstring>
 #include <ranges>
 #include <string>
 
 #include <gmpxx.h>
 
 #include "monomial.hpp"
+#include "order.hpp"
 
 namespace gamba
 {
@@ -30,12 +30,12 @@ namespace gamba
 struct generators_data
 {
     using var_type     = uint32_t;
-    using coeff_type   = mpz_class;
+    using coeff_type   = mpq_class;
     using coeff_p_type = uint32_t;
     using exp_type     = int32_t;
 
     /* type used by the engine to represent exponent */
-    using exponent_type = typename monomial_base::exponent_type;
+    using exponent_type = monomial_base::exponent_type;
 
     void read(std::istream& infile);
 
@@ -79,17 +79,17 @@ public:
     std::vector<size_t> lens{};
 };
 
-template <class MonomialType>
+template <class MonomialType, class MonomialOrder>
 std::string monomial2string(MonomialType const& mon)
 {
     using monomial_type  = MonomialType;
-    using monomial_order = typename monomial_type::monomial_order;
+    using monomial_order = MonomialOrder;
 
     constexpr size_t const offset =
         std::is_same_v<monomial_order, order_blockelim> ? 2 : 1;
 
     static auto const names =
-        std::views::iota(0ULL, monomial_type::size() - offset)
+        std::views::iota(0ULL, mon.size() - offset)
         | std::views::transform([](auto i) { return "x" + std::to_string(i); });
 
     auto const* const exp = mon.cbegin();
@@ -101,7 +101,7 @@ std::string monomial2string(MonomialType const& mon)
     {
         auto const e = exp[i++];
         /* skip degree of second block (if present) */
-        if (i == monomial_order::block_size)
+        if (i == monomial_type::block_size)
             ++i;
 
         if (e == 0)
@@ -119,15 +119,14 @@ template <class MonomialType>
 void monomial2exponent(MonomialType const& mon,
                        generators_data::exp_type* const out)
 {
-    using monomial_type  = MonomialType;
-    using monomial_order = typename monomial_type::monomial_order;
+    using monomial_type = MonomialType;
 
     auto const* const exp = mon.cbegin();
 
     for (size_t i = 1, j = 0; i < mon.size(); ++i)
     {
         /* skip degree of second block (if present) */
-        if (i == monomial_order::block_size)
+        if (i == monomial_type::block_size)
             continue;
 
         out[j++] = static_cast<generators_data::exp_type>(exp[i]);

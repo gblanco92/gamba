@@ -16,64 +16,71 @@
 
 #pragma once
 
-#include <sys/types.h>
-
 namespace gamba
 {
 
-struct f4_statistics
+struct stats
 {
-    /* timings */
-    double update_cputime{0.0};
-    double update_walltime{0.0};
+    static void init();
 
-    double select_cputime{0.0};
-    double select_walltime{0.0};
+    static void reset_statistics();
 
-    double matrix_cputime{0.0};
-    double matrix_walltime{0.0};
+    static void reset_timings();
 
-    double symbolic_cputime{0.0};
-    double symbolic_walltime{0.0};
+    static void print_statistics();
 
-    double convert_cputime{0.0};
-    double convert_walltime{0.0};
+    static void print_timings();
 
-    double linalg_cputime{0.0};
-    double linalg_walltime{0.0};
+    /* GamBa timings */
+    static double update_cputime;
+    static double update_walltime;
 
-    double insert_cputime{0.0};
-    double insert_walltime{0.0};
+    static double select_cputime;
+    static double select_walltime;
 
-    double reduce_cputime{0.0};
-    double reduce_walltime{0.0};
+    static double matrix_cputime;
+    static double matrix_walltime;
 
-    double linalg_reduce_cputime{0.0};
-    double linalg_reduce_walltime{0.0};
+    static double symbolic_cputime;
+    static double symbolic_walltime;
 
-    double overall_cputime{0.0};
-    double overall_walltime{0.0};
+    static double convert_cputime;
+    static double convert_walltime;
 
-    /* F4 data */
-    ssize_t spairs_reduced{0};
+    static double linalg_cputime;
+    static double linalg_walltime;
 
-    ssize_t gm_criteria{0};
+    static double insert_cputime;
+    static double insert_walltime;
 
-    ssize_t redundant_elem{0};
+    static double reduce_cputime;
+    static double reduce_walltime;
 
-    size_t rows_reduced{0};
+    static double linalg_interred_cputime;
+    static double linalg_interred_walltime;
 
-    size_t zero_reductions{0};
+    static double reconstruct_cputime;
+    static double reconstruct_walltime;
 
-    size_t max_size_bht{0};
-    size_t max_size_sht{0};
-    size_t max_size_mht{0};
+    static double overall_cputime;
+    static double overall_walltime;
+
+    /* GamBa stats */
+    static ssize_t spairs_reduced;
+
+    static ssize_t gm_criteria;
+
+    static ssize_t redundant_elem;
+
+    static size_t rows_reduced;
+
+    static size_t zero_reductions;
+
+    static size_t max_size_bht;
+    static size_t max_size_sht;
+    static size_t max_size_mht;
+
+    static size_t num_primes;
 };
-
-extern f4_statistics stats;
-
-void print_statistics();
-
-void print_timings();
 
 }  // namespace gamba

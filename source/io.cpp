@@ -16,11 +16,15 @@
 
 #include "io.hpp"
 
+#include <flint/ulong_extras.h>
 #include <gmpxx.h>
 
 #include "utils.hpp"
 
 namespace gamba
+{
+
+namespace
 {
 
 std::string remove_spaces(std::string line)
@@ -41,104 +45,6 @@ std::string remove_trailing_comma(std::string line)
         return line.substr(0, pos);
 
     return line;
-}
-
-void generators_data::read_num_vars(std::istream& infile)
-{
-    std::string line;
-    if (not std::getline(infile, line))
-        throw std::runtime_error("Input file is empty.");
-
-    line = remove_spaces(line);
-    line = remove_trailing_comma(line);
-
-    /* the number of variables is the number of commas + 1 */
-    num_vars = static_cast<uint32_t>(
-        std::count(std::cbegin(line), std::cend(line), ',') + 1);
-}
-
-void generators_data::read_characteristic(std::istream& infile)
-{
-    std::string line;
-    if (not std::getline(infile, line))
-        throw std::runtime_error(
-            "Missing line containing field characteristic.");
-
-    int64_t fc;
-    try
-    {
-        fc = std::stoll(line);
-    }
-    catch (...)
-    {
-        throw std::runtime_error("Field characteristic not valid.");
-    }
-
-    if (fc < 0 or fc > std::numeric_limits<uint32_t>::max())
-    {
-        throw std::runtime_error(
-            "Field characteristic must be >= 0 and < 2^32.");
-    }
-
-    mpz_class p{static_cast<unsigned long int>(fc)};  // NOLINT
-    int32_t const is_prime = mpz_probab_prime_p(p.get_mpz_t(), 50);
-
-    if (not is_prime)
-        throw std::runtime_error("Field characteristic is not a prime number.");
-
-    field_char = static_cast<uint32_t>(fc);
-}
-
-void generators_data::read_num_generators(std::istream& infile)
-{
-    std::string line;
-    for (num_gens = 0; getline(infile, line, ',');)
-    {
-        /* check if there are empty lines in the input file */
-        line = remove_spaces(line);
-        line = remove_trailing_comma(line);
-
-        if (not line.empty())
-            ++num_gens;
-    }
-}
-
-void generators_data::read_variable_names(std::istream& infile)
-{
-    std::string line;
-    std::getline(infile, line);
-
-    line = remove_spaces(line);
-    line = remove_trailing_comma(line);
-    std::istringstream iline{line};
-
-    /* variable names can't begin with one of this characters */
-    static std::string const restricted_chars{"+-*^"};
-
-    std::string var_name;
-    while (std::getline(iline, var_name, ','))
-    {
-        if (var_name.empty())
-        {
-            throw std::runtime_error("Empty variable name.");
-        }
-
-        if (std::isdigit(var_name[0])
-            or restricted_chars.find(var_name[0]) != std::string::npos)
-        {
-            throw std::runtime_error("Invalid variable name: " + var_name
-                                     + ".");
-        }
-
-        if (std::find(std::cbegin(var_names), std::cend(var_names), var_name)
-            != std::cend(var_names))
-        {
-            throw std::runtime_error("Duplicated variable name: " + var_name
-                                     + ".");
-        }
-
-        var_names.emplace_back(var_name);
-    }
 }
 
 std::string read_term(std::string& line, std::string::iterator& it)
@@ -178,6 +84,111 @@ mpq_class term_to_mpq(std::string line, size_t* pos)
 
     *pos = sz + (sign != 0);
     return cf;
+}
+
+}  // namespace
+
+void generators_data::read_num_vars(std::istream& infile)
+{
+    std::string line;
+    if (not std::getline(infile, line))
+        throw std::runtime_error("Input file is empty.");
+
+    line = remove_spaces(line);
+    line = remove_trailing_comma(line);
+
+    /* the number of variables is the number of commas + 1 */
+    num_vars = static_cast<uint32_t>(
+        std::count(std::cbegin(line), std::cend(line), ',') + 1);
+}
+
+void generators_data::read_characteristic(std::istream& infile)
+{
+    std::string line;
+    if (not std::getline(infile, line))
+    {
+        throw std::runtime_error(
+            "Missing line containing field characteristic.");
+    }
+
+    uint64_t fc;
+    try
+    {
+        fc = std::stoull(line);
+    }
+    catch (...)
+    {
+        throw std::runtime_error("Field characteristic not valid.");
+    }
+
+    if (fc < 0 or fc > std::numeric_limits<int32_t>::max())  // signed
+    {
+        throw std::runtime_error(
+            "Field characteristic must be >= 0 and < 2^31.");
+    }
+
+    if (fc == 0)
+        return;
+
+    if (not n_is_prime(fc))
+    {
+        throw std::runtime_error("Field characteristic is not a prime number.");
+    }
+
+    field_char = static_cast<uint32_t>(fc);
+}
+
+void generators_data::read_num_generators(std::istream& infile)
+{
+    std::string line;
+    for (num_gens = 0; getline(infile, line, ',');)
+    {
+        /* check if there are empty lines in the input file */
+        line = remove_spaces(line);
+        line = remove_trailing_comma(line);
+
+        if (not line.empty())
+            ++num_gens;
+    }
+}
+
+void generators_data::read_variable_names(std::istream& infile)
+{
+    std::string line;
+    std::getline(infile, line);
+
+    line = remove_spaces(line);
+    line = remove_trailing_comma(line);
+
+    std::istringstream iline{line};
+
+    /* variable names can't begin with one of this characters */
+    static std::string const restricted_chars{"+-*^"};
+
+    std::string var_name;
+    while (std::getline(iline, var_name, ','))
+    {
+        if (var_name.empty())
+        {
+            throw std::runtime_error("Empty variable name.");
+        }
+
+        if (std::isdigit(var_name[0])
+            or restricted_chars.find(var_name[0]) != std::string::npos)
+        {
+            throw std::runtime_error("Invalid variable name: " + var_name
+                                     + ".");
+        }
+
+        if (std::find(std::cbegin(var_names), std::cend(var_names), var_name)
+            != std::cend(var_names))
+        {
+            throw std::runtime_error("Duplicated variable name: " + var_name
+                                     + ".");
+        }
+
+        var_names.emplace_back(var_name);
+    }
 }
 
 void generators_data::read_exponent(std::string term)
@@ -245,8 +256,6 @@ void generators_data::read_generator_line(std::string line,
 {
     size_t num_terms{0};
 
-    std::vector<mpq_class> tmp;
-
     for (auto it = std::begin(line); it != std::end(line);)
     {
         std::string term{read_term(line, it)};
@@ -272,13 +281,13 @@ void generators_data::read_generator_line(std::string line,
         }
 
         /* denominators cannot be divisible by field characteristic */
-        if (cf.get_den() % field_char == 0)
+        if (field_char != 0 and cf.get_den() % field_char == 0)
         {
             throw std::runtime_error("Division by zero in generator number "
                                      + std::to_string(line_num) + ".");
         }
 
-        tmp.emplace_back(std::move(cf));
+        coeffs.emplace_back(std::move(cf));
         ++num_terms;
 
         /* skip the * in a monomial like 2*xy */
@@ -304,20 +313,6 @@ void generators_data::read_generator_line(std::string line,
                 + " must be >= 0 or < " + std::to_string(max_exp_bound) + ".");
         }
     }
-
-    /* compute lcm of denominators */
-    mpz_class const lcm0 =
-        std::accumulate(std::cbegin(tmp), std::cend(tmp), mpz_class{1},
-                        [](mpz_class const& acc, mpq_class const& c) {
-                            return lcm(acc, c.get_den());
-                        });
-
-    /* clear denominators in input polynomials */
-    std::transform(std::cbegin(tmp), std::cend(tmp), std::back_inserter(coeffs),
-                   [&lcm0](mpq_class const& c) {
-                       mpq_class prod{c * lcm0};
-                       return prod.get_num();
-                   });
 
     lens.emplace_back(num_terms);
 }
@@ -365,10 +360,15 @@ void generators_data::read(std::istream& infile)
     {
         coeffs_modp.resize(coeffs.size());
 
-        std::transform(std::cbegin(coeffs), std::cend(coeffs),
-                       std::begin(coeffs_modp), [this](mpz_class const& c) {
-                           return mpz_fdiv_ui(c.get_mpz_t(), field_char);
-                       });
+        std::ranges::transform(
+            coeffs, std::begin(coeffs_modp), [this](mpq_class const& c) {
+                uint64_t const a =
+                    mpz_fdiv_ui(c.get_num().get_mpz_t(), field_char);
+                uint64_t const b =
+                    mpz_fdiv_ui(c.get_den().get_mpz_t(), field_char);
+
+                return n_mulmod2(a, n_invmod(b, field_char), field_char);
+            });
     }
 }
 
@@ -384,10 +384,14 @@ bool generators_data::write_monomial(std::ostream& outfile, size_t offset) const
         if (exp > 0)
         {
             if (exp == 1)
+            {
                 outfile << (Star or not flag ? "*" : "") << var_names[k];
+            }
             else
+            {
                 outfile << (Star or not flag ? "*" : "") << var_names[k] << "^"
                         << exp;
+            }
 
             flag = false;
         }
@@ -406,6 +410,7 @@ void generators_data::write_generators(
         for (size_t j = 0; j < lens[i]; ++j)
         {
             auto const& cf = coeff[offset + j];
+
             if (cf == 0)
                 continue;
 
@@ -431,6 +436,7 @@ void generators_data::write_generators(
         }
 
         outfile << (i != num_gens - 1 ? "," : "") << std::endl;
+
         offset += lens[i];
     }
 }
@@ -443,9 +449,13 @@ void generators_data::write(std::ostream& outfile) const
     outfile << std::endl << field_char << std::endl;
 
     if (field_char > 0)
+    {
         write_generators(outfile, coeffs_modp);
+    }
     else
+    {
         write_generators(outfile, coeffs);
+    }
 }
 
 }  // namespace gamba

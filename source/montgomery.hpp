@@ -59,7 +59,8 @@ struct montgomery
         /* this overflows but its a feature not a bug */
         integer_type const q  = static_cast<integer_type>(x) * nr;
         next_int_type const m = static_cast<next_int_type>(q) * n;
-        integer_type const y  = static_cast<integer_type>((x - m) >> num_bits);
+        integer_type const y  =  // NOLINT
+            static_cast<integer_type>((x - m) >> num_bits);
 
         return x < m ? y + n : y;
     }

@@ -18,29 +18,32 @@
 
 #include <limits>
 
+#include "base_basis.hpp"
 #include "divmask.hpp"
+#include "order.hpp"
 #include "spair.hpp"
 #include "stats.hpp"
 
 namespace gamba
 {
 
-template <class MonomialOrder, class BasisType>
-void update_spairs(spair_set<MonomialOrder>& spairs,
-                   BasisType& basis,
+namespace update
+{
+
+template <class MonomialOrder>
+void update_spairs(spair_set& spairs,
+                   base_polynomial_basis& basis,
                    size_t const h) /* index of an element in basis */
 {
     using monomial_order = MonomialOrder;
-    using basis_type     = BasisType;
-    using spair_set_type = ::gamba::spair_set<monomial_order>;
+    using basis_type     = base_polynomial_basis;
 
-    using monomial_context = spair_set_type::monomial_context;
-    using monomial_type    = spair_set_type::monomial_type;
+    using monomial_context = spair_set::monomial_context;
+    using monomial_type    = spair_set::monomial_type;
 
     using basis_monomial_context = basis_type::monomial_context;
     using basis_monomial_type    = basis_type::monomial_type;
 
-    using spair_type         = spair_type<monomial_order>;
     using degree_type        = spair_type::degree_type;
     using index_type         = basis_type::index_type;
     using signed_degree_type = spair_type::signed_degree_type;
@@ -85,7 +88,7 @@ void update_spairs(spair_set<MonomialOrder>& spairs,
         /* the divmask of a lcm is the bitwise OR of the divmasks */
         divmask_type const sdm = divmask_type{sdm_i.mask | sdm_h.mask};
         /* the degree of the least common multiple monomial */
-        degree_type const deg_lcm = lcm.degree();
+        degree_type const deg_lcm = monomial_order::degree(lcm);
 
         /* create the new spair */
         spairs.queue.push_back({.lcm  = lcm,
@@ -126,9 +129,9 @@ void update_spairs(spair_set<MonomialOrder>& spairs,
         else
         {
             auto const deg_i = static_cast<signed_degree_type>(
-                (deg_lcm - lm_i.degree()) + basis.degree(i));
+                (deg_lcm - monomial_order::degree(lm_i) + basis.degree(i)));
             auto const deg_h = static_cast<signed_degree_type>(
-                (deg_lcm - lm_h.degree()) + basis.degree(h));
+                (deg_lcm - monomial_order::degree(lm_h) + basis.degree(h)));
 
             sp_i.deg = deg_i > deg_h ? deg_i : deg_h;
         }
@@ -263,16 +266,20 @@ void update_spairs(spair_set<MonomialOrder>& spairs,
     /* every time spair_count are decreased new deleted gens. can be created */
     basis.update_deleted_gens();
 
-    stats.gm_criteria += std::distance(new_end, std::end(spairs.queue));
+    stats::gm_criteria += std::distance(new_end, std::end(spairs.queue));
 
     spairs.queue.erase(new_end, std::cend(spairs.queue));
 }
 
-template <class MonomialOrder, class BasisType>
-void update_f4(spair_set<MonomialOrder>& spairs,
-               BasisType& basis,
+}  // namespace update
+
+template <class MonomialOrder>
+void update_f4(spair_set& spairs,
+               base_polynomial_basis& basis,
                size_t const prev_num_gens)
 {
+    using monomial_order = MonomialOrder;
+
     /* timings */
     auto const start_cputime  = std::clock();
     auto const start_walltime = std::chrono::system_clock::now();
@@ -283,7 +290,7 @@ void update_f4(spair_set<MonomialOrder>& spairs,
     /* update and remove spairs */
     for (size_t i = prev_num_gens; i < basis.num_gens(); ++i)
     {
-        update_spairs(spairs, basis, i);
+        update::update_spairs<monomial_order>(spairs, basis, i);
     }
 
     /* trigger a rehash of spair's hash table */
@@ -293,15 +300,15 @@ void update_f4(spair_set<MonomialOrder>& spairs,
     }
 
     /* update and make generators redundant */
-    basis.update_reduced_gens(prev_num_gens);
+    basis.update_reduced_gens(prev_num_gens, monomial_order{});
 
     /* timings */
     auto const end_cputime  = std::clock();
     auto const end_walltime = std::chrono::system_clock::now();
 
-    stats.update_walltime +=
+    stats::update_walltime +=
         std::chrono::duration<double>(end_walltime - start_walltime).count();
-    stats.update_cputime +=
+    stats::update_cputime +=
         static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
 }
 

@@ -30,8 +30,6 @@ template <class ElementType>
 using aligned_vector =
     std::vector<ElementType, aligned_allocator<ElementType, CACHE_LINE_SIZE>>;
 
-constexpr size_t const HUGE_PAGE_SIZE = aligned_allocator<int>::huge_page_size;
-
 template <class ElementType>
 using hugepage_vector =
     std::vector<ElementType, aligned_allocator<ElementType, HUGE_PAGE_SIZE>>;

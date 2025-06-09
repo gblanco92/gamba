@@ -18,12 +18,10 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdint>
 #include <random>
-#include <type_traits>
 
 #include "divmask.hpp"
-#include "order.hpp"
+#include "utils.hpp"
 
 namespace gamba
 {
@@ -69,17 +67,17 @@ struct monomial_data<matrix_hashtable> : monomial_data<void>
 struct monomial_base
 {
     using exponent_type     = uint16_t;
-    using exponent_type_ptr = exponent_type const*;
+    using exponent_ptr_type = exponent_type const*;
 
     using monomial_data_type = monomial_data<void>;
-    using hash_type          = typename monomial_data_type::hash_type;
+    using hash_type          = monomial_data_type::hash_type;
     using weight_type        = hash_type;
 
-    static size_t size() { return exp_size; }
+    size_t size() const { return exp_size; }  // NOLINT
 
-    static void initialize_weights(size_t const seed)
+    static void initialize_weights()
     {
-        std::mt19937_64 eng{seed};
+        std::mt19937_64 eng{params::seed};
 
         std::uniform_int_distribution<weight_type> dist(
             1, std::numeric_limits<weight_type>::max());
@@ -89,8 +87,10 @@ struct monomial_base
                       [&]() { return dist(eng); });
     }
 
-    /* length of exponen vector including degree(s) */
+    /* length of exponent vector including degree(s) */
     static inline size_t exp_size{0};
+    /* number of elimination variables + degree of the block */
+    static inline size_t block_size{0};
 
 protected:
     /* weights to compute the hashes */
@@ -98,32 +98,31 @@ protected:
 }; /* end class monomial_base */
 
 /* forward declaration */
-template <class, class>
+template <class>
 class monomial;
 
-template <class MonomialContext, class MonomialOrder>
+template <class MonomialContext>
 class monomial_init : public monomial_base
 {
 public:
     using monomial_context = MonomialContext;
-    using monomial_order   = MonomialOrder;
-    using monomial_type    = monomial<monomial_context, monomial_order>;
+    using monomial_type    = monomial<monomial_context>;
 
 private:
     /* constructor only accessible via static methods */
     monomial_init() { assert(m_exp != nullptr); }
 
 public:
-    exponent_type_ptr cbegin() const { return m_exp; }
+    exponent_ptr_type cbegin() const { return m_exp; }
 
-    exponent_type_ptr cend() const { return m_exp + size(); }
+    exponent_ptr_type cend() const { return m_exp + size(); }
 
     /* the monomial_init template class has always its hash value stored in the
      * member variable hash */
     hash_type hash() const { return m_hash; }
 
 private:
-    void compute_hash()
+    FORCE_INLINE void compute_hash()
     {
         m_hash = 0;
         for (size_t i = 0; i < m_weights.size(); ++i)
@@ -133,30 +132,26 @@ private:
 public:
     /* construct a valid monomial from external memory */
     static monomial_init construct(int32_t const* const mon_exp,
-                                   size_t const num_vars)
+                                   size_t const num_vars,
+                                   size_t const num_elim_vars)
     {
-        /* ::block_size counts also the degree in the first block */
-        static size_t const num_elim_vars = is_block_order_v<monomial_order>
-                                              ? order_blockelim::block_size - 1
-                                              : 0;
-
-        constexpr size_t const off =
-            std::is_same_v<monomial_order, order_blockelim> ? 2 : 1;
+        size_t const off = num_elim_vars > 0 ? 2 : 1;
+        size_t const ebk = block_size;
 
         monomial_init mon;
-        mon.m_exp[0] = mon.m_exp[monomial_order::block_size] = 0;
+        m_exp[0] = m_exp[ebk] = 0;
 
         for (size_t i = 0; i < num_elim_vars; ++i)
         {
-            mon.m_exp[i + 1] = static_cast<exponent_type>(mon_exp[i]);
+            m_exp[i + 1] = static_cast<exponent_type>(mon_exp[i]);
             /* degree */
-            mon.m_exp[0] += mon.m_exp[i + 1];
+            m_exp[0] += m_exp[i + 1];
         }
         for (size_t i = num_elim_vars; i < num_vars; ++i)
         {
-            mon.m_exp[i + off] = static_cast<exponent_type>(mon_exp[i]);
+            m_exp[i + off] = static_cast<exponent_type>(mon_exp[i]);
             /* degree */
-            mon.m_exp[monomial_order::block_size] += mon.m_exp[i + off];
+            m_exp[ebk] += m_exp[i + off];
         }
 
         mon.compute_hash();
@@ -166,30 +161,30 @@ public:
 
     /* creates the least common multiple (lcm) of the lhs and rhs monomials */
     template <class OtherMonomialContext>
-    static monomial_init lcm(
-        monomial<OtherMonomialContext, monomial_order> const lhs,
-        monomial<OtherMonomialContext, monomial_order> const rhs)
+    static monomial_init lcm(monomial<OtherMonomialContext> const lhs,
+                             monomial<OtherMonomialContext> const rhs)
         requires std::same_as<monomial_context, spair_hashtable>
     {
-        size_t const ebz = monomial_order::block_size;
+        size_t const esz = exp_size;
+        size_t const ebk = block_size;
 
-        exponent_type_ptr const elhs = lhs.cbegin();
-        exponent_type_ptr const erhs = rhs.cbegin();
+        exponent_ptr_type const elhs = lhs.cbegin();
+        exponent_ptr_type const erhs = rhs.cbegin();
 
         monomial_init mon;
         /* ignore degree(s) */
-        for (size_t i = 1; i < mon.size(); ++i)
-            mon.m_exp[i] = elhs[i] < erhs[i] ? erhs[i] : elhs[i];
+        for (size_t i = 1; i < esz; ++i)
+            m_exp[i] = elhs[i] < erhs[i] ? erhs[i] : elhs[i];
 
         /* reset degrees */
-        mon.m_exp[0] = mon.m_exp[ebz] = 0;
+        m_exp[0] = m_exp[ebk] = 0;
 
         /* if not using an elimination order the first loop is not executed and
          * the degree is computed in the second loop */
-        for (size_t i = 1; i < ebz; ++i)
-            mon.m_exp[0] += mon.m_exp[i];
-        for (size_t i = ebz + 1; i < mon.size(); ++i)
-            mon.m_exp[ebz] += mon.m_exp[i];
+        for (size_t i = 1; i < ebk; ++i)
+            m_exp[0] += m_exp[i];
+        for (size_t i = ebk + 1; i < esz; ++i)
+            m_exp[ebk] += m_exp[i];
 
         mon.compute_hash();
 
@@ -198,62 +193,66 @@ public:
 
     /* creates the quotient monomial mon1/mon2 assuming mon2 divides mon1 */
     template <class OtherMonomialContext>
-    static monomial_init quotient(
-        monomial<OtherMonomialContext, monomial_order> const mon1,
-        monomial_type const mon2)
+    static monomial_init quotient(monomial<OtherMonomialContext> const mon1,
+                                  monomial_type const mon2)
     {
-        exponent_type_ptr const exp1 = mon1.cbegin();
-        exponent_type_ptr const exp2 = mon2.cbegin();
+        size_t const esz = exp_size;
+
+        exponent_ptr_type const exp1 = mon1.cbegin();
+        exponent_ptr_type const exp2 = mon2.cbegin();
 
         monomial_init mon;
         mon.m_hash = mon1.hash() - mon2.hash();
 
-        for (size_t i = 0; i < mon.size(); ++i)
+        for (size_t i = 0; i < esz; ++i)
         {
             assert(exp1[i] >= exp2[i]);
-            mon.m_exp[i] = exp1[i] - exp2[i];
+            m_exp[i] = exp1[i] - exp2[i];
         }
 
         return mon;
     }
 
     /* create the quotient monomial mon1 * mon2, may overflow exponent type */
-    static monomial_init product(
-        monomial_init<basis_hashtable, monomial_order> const mon1,
-        monomial<basis_hashtable, monomial_order> const mon2)
+    template <class OtherMonomialContext>
+    static monomial_init product(monomial_init<basis_hashtable> const mon1,
+                                 monomial<OtherMonomialContext> const mon2)
         requires std::same_as<monomial_context, matrix_hashtable>
     {
-        exponent_type_ptr const exp1 = mon1.cbegin();
-        exponent_type_ptr const exp2 = mon2.cbegin();
+        size_t const esz = exp_size;
+
+        exponent_ptr_type const exp1 = mon1.cbegin();
+        exponent_ptr_type const exp2 = mon2.cbegin();
 
         monomial_init mon;
         mon.m_hash = mon1.hash() + mon2.hash();
 
-        for (size_t i = 0; i < mon.size(); ++i)
-            mon.m_exp[i] = exp1[i] + exp2[i];
+        for (size_t i = 0; i < esz; ++i)
+            m_exp[i] = exp1[i] + exp2[i];
 
         return mon;
     }
 
     template <class OtherMonomialContext>
-    static monomial_init copy(
-        monomial<OtherMonomialContext, monomial_order> const other)
+    static monomial_init copy(monomial<OtherMonomialContext> const other)
         requires(not std::same_as<monomial_context, OtherMonomialContext>)
     {
-        exponent_type_ptr const exp = other.cbegin();
+        size_t const esz = exp_size;
+
+        exponent_ptr_type const exp = other.cbegin();
 
         monomial_init mon;
         /* all monomial contexts share the same weights */
         mon.m_hash = other.hash();
 
-        for (size_t i = 0; i < mon.size(); ++i)
-            mon.m_exp[i] = exp[i];
+        for (size_t i = 0; i < esz; ++i)
+            m_exp[i] = exp[i];
 
         return mon;
     }
 
 private:
-    template <class, class>
+    template <class>
     friend class monomial;
 
     template <class>
@@ -265,14 +264,13 @@ private:
     hash_type m_hash{};
 }; /* end class monomial_init */
 
-template <class MonomialContext, class MonomialOrder>
+template <class MonomialContext>
 class monomial : public monomial_base
 {
 public:
-    using monomial_order   = MonomialOrder;
     using monomial_context = MonomialContext;
     using monomial_data_t  = monomial_data<monomial_context>;
-    using monomial_init_t  = monomial_init<monomial_context, monomial_order>;
+    using monomial_init_t  = monomial_init<monomial_context>;
 
     using index_type  = typename monomial_data_t::index_type;
     using hash_type   = typename monomial_data_t::hash_type;
@@ -311,29 +309,22 @@ public:
 
     bool operator==(monomial const other) const { return m_idx == other.m_idx; }
 
-    exponent_type_ptr cbegin() const { return exps_v + size() * m_idx; }
+    exponent_ptr_type cbegin() const { return exps_v + size() * m_idx; }
 
-    exponent_type_ptr cend() const { return exps_v + size() * (m_idx + 1); }
+    exponent_ptr_type cend() const { return exps_v + size() * (m_idx + 1); }
 
     hash_type hash() const { return data_v[m_idx].hash; }
-
-    degree_type degree() const
-        requires std::same_as<monomial_context, basis_hashtable>
-              or std::same_as<monomial_context, spair_hashtable>
-    {
-        return monomial_order::degree(*this);
-    }
 
     monomial_data_t& data() const { return data_v[m_idx]; }
 
     /* returns true if lhs divides rhs (lhs | rhs), otherwise returns false */
     template <class OtherMonomialContext>
     static bool check_monomial_division(
-        monomial<OtherMonomialContext, MonomialOrder> const lhs,
+        monomial<OtherMonomialContext> const lhs,
         monomial const rhs)
     {
-        exponent_type_ptr const elhs = lhs.cbegin();
-        exponent_type_ptr const erhs = rhs.cbegin();
+        exponent_ptr_type const elhs = lhs.cbegin();
+        exponent_ptr_type const erhs = rhs.cbegin();
 
         exponent_type flag{0};
         for (size_t i = 0; i < exp_size; ++i)
@@ -345,7 +336,7 @@ public:
     /* returns true if lhs divides rhs (lhs | rhs), otherwise returns false */
     template <class OtherMonomialContext>
     static bool check_monomial_division_divmask(
-        monomial<OtherMonomialContext, monomial_order> lhs_mon,
+        monomial<OtherMonomialContext> lhs_mon,
         divmask_type const lhs_sdm,
         monomial const rhs_mon,
         divmask_type const rhs_sdm)
@@ -357,8 +348,8 @@ public:
             return false;
         }
 
-        exponent_type_ptr const elhs = lhs_mon.cbegin();
-        exponent_type_ptr const erhs = rhs_mon.cbegin();
+        exponent_ptr_type const elhs = lhs_mon.cbegin();
+        exponent_ptr_type const erhs = rhs_mon.cbegin();
 
         exponent_type flag{0};
         for (size_t i = 0; i < exp_size; ++i)
@@ -370,27 +361,27 @@ public:
     /* returns true if gcd(lhs, rhs) = 1 */
     static bool coprime_monomials(monomial const lhs, monomial const rhs)
     {
-        exponent_type_ptr const elhs = lhs.cbegin();
-        exponent_type_ptr const erhs = rhs.cbegin();
+        exponent_ptr_type const elhs = lhs.cbegin();
+        exponent_ptr_type const erhs = rhs.cbegin();
 
         exponent_type flag{0};
         /* take into account the presence of degree(s) */
-        for (size_t i = 1; i < monomial_order::block_size; ++i)
+        for (size_t i = 1; i < block_size; ++i)
             flag |= (elhs[i] != 0 and erhs[i] != 0);
-        for (size_t i = monomial_order::block_size + 1; i < exp_size; ++i)
+        for (size_t i = block_size + 1; i < exp_size; ++i)
             flag |= (elhs[i] != 0 and erhs[i] != 0);
 
         return flag == 0;
     }
 
-    static exponent_type_ptr exps_vect() { return exps_v; }
+    static exponent_ptr_type exps_vect() { return exps_v; }
 
 private:
     template <class>
     friend class monomial_flat_set;
 
-    static inline monomial_data_t* data_v;
-    static inline exponent_type* exps_v;
+    static inline monomial_data_t* data_v{nullptr};
+    static inline exponent_type* exps_v{nullptr};
 
     static inline size_t load;
     // static inline size_t idx; // TODO thread_local
@@ -400,20 +391,20 @@ private:
 
 struct monomial_equal_to
 {
-    using exponent_type     = typename monomial_base::exponent_type;
-    using exponent_type_ptr = typename monomial_base::exponent_type_ptr;
+    using exponent_type     = monomial_base::exponent_type;
+    using exponent_ptr_type = monomial_base::exponent_ptr_type;
 
     using is_transparent = void;
 
-    template <class MonomialContext, class MonomialOrder>
-    bool operator()(monomial_init<MonomialContext, MonomialOrder> const mon1,
-                    monomial<MonomialContext, MonomialOrder> const mon2) const
+    template <class MonomialContext>
+    bool operator()(monomial_init<MonomialContext> const mon1,
+                    monomial<MonomialContext> const mon2) const
     {
         if (mon1.hash() != mon2.hash())
             return false;
 
-        exponent_type_ptr const exp1 = mon1.cbegin();
-        exponent_type_ptr const exp2 = mon2.cbegin();
+        exponent_ptr_type const exp1 = mon1.cbegin();
+        exponent_ptr_type const exp2 = mon2.cbegin();
 
         exponent_type flag{0};
         for (size_t i = 0; i < mon1.size(); ++i)

@@ -1,8 +1,10 @@
 # GamBa
 
-`GamBa` is a fast program for computing Groebner bases in polynomial rings. 
+**`GamBa` is a fast program for computing Groebner bases in polynomial rings.**
 
 `GamBa` features a high-performance C++ implementation of the Monte-Carlo F4 algorithm. It currently supports prime characteristics in the range $(2^1, 2^{31})$ together with the `grevlex` and the `block-grevlex` monomial orders.
+
+> **Warning:** Some parts of `GamBa` will remain closed-source for the time being, so it is not currently possible to build `GamBa` from source. If you want to try out `GamBa`, use the provided binaries.
 
 ## Benchmarks
 
@@ -10,7 +12,7 @@
 
 Here is a comparison with other implementations of the F4 algorithm. Systems are run with default parameters and the best of three timings is recorded. All times are in seconds.
 
-> *Benchmark system*: AMD Ryzen 5 3600 @3.60Ghz 6-Core Processor (Zen 2), 64 GiB of dual-channel RAM @3200 MT/s. 
+> *Benchmark system*: AMD Ryzen 5 3600 @3.60Ghz 6-Core Processor (Zen 2), 64 GiB DDR4 dual channel RAM @3200 MT/s.
 TurboCore = Off, Multithreading = Off, CPU_Mitigations = Off. (Ubuntu 22.04.4 LTS)
 
 | $\ \ \ \ p = 32003$ | gamba v0.1  | magma v2.28  | msolve v0.6.8 | Grobner.jl v0.7.5 | FGb v1.68
@@ -24,7 +26,7 @@ TurboCore = Off, Multithreading = Off, CPU_Mitigations = Off. (Ubuntu 22.04.4 LT
 | noon8 | **3.9** | 14.0 | 48.2 | 52.3 | 15.8 |
 | noon9 | **5.8** | 13.8 | 8.0 | 18.5 | 7.8 |
 | CP(4,9,9) | **81.1** | 357.4 | 2,096.8 | 974.4 | 501.3 |
-| CP(4,10,10) | **1,607.7** | 6,623.0 | 54,387.2 | $-$ | 10,573.2 |
+| CP(4,10,10) | **1,607.7** | 6,623.0 | 54,387.2 | $-^*$ | 10,573.2 |
 | reimer8 | **7.7** | 21.0 | 26.4 | 22.9 | 17.0 |
 | reimer9 | **315.0** | 981.9 | 1,333.0 | 755.3 | 726.3 |
 | minrank(2,2,13,2) | **4,107.4** | 11,860.6 | $-$ | $-$ | 17,884.2 |
@@ -52,9 +54,9 @@ TurboCore = Off, Multithreading = Off, CPU_Mitigations = Off. (Ubuntu 22.04.4 LT
 | reimer8 | **9.2** | 17.4 | 16.3 | 22.9 | 16.4 |
 | reimer9 | **380.8** | 935.6 | 745.9 | 766.2 | 692.5 |
 | minrank(2,2,13,2) | **6,214.1** | 16,631.8 | 10,502.2 | $-$ | 17,858.7 |
-| minrank(3,2,9,2) | **2461.0** | 9,915.0 | 5,979.1 | $-$ | 10,251.8 |
+| minrank(3,2,9,2) | **2,461.0** | 9,915.0 | 5,979.1 | $-$ | 10,251.8 |
 
-<sub>Entries with a dash mean that the computation either did not finish in less than 24 hours or it ran out of memory.</sub>
+<sub>$^*$ Entries with a dash mean that the computation either did not finish in less than 24 hours or it ran out of memory.</sub>
 
 ## Usage
 
@@ -82,4 +84,4 @@ The `GamBa` binary requires a Linux x86-64 system with `glibc` version 2.24 or n
 
 ## Licensing
 
-The public source code of `GamBa` is distributed under the GNU General Public License 3.0 (GPLv3), see the [LICENSE](LICENSE.md) document. Some components of `GamBa` will remain closed source for the time being.
+The public source code of `GamBa` is distributed under the GNU General Public License 3.0 (GPLv3), see the [LICENSE](LICENSE.md) document.

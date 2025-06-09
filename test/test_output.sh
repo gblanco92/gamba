@@ -12,7 +12,7 @@ if [[ $# -eq 3 ]]; then
 fi
 
 # run with default max. spairs
-OUT1=$(${BINARY_DIR}/gamba -i ../examples/${EXAMPLE_NAME}.txt -e $NUM_ELIM -o /dev/stderr 2>&1 > /dev/null)
+OUT1=$(${BINARY_DIR}/gamba -i ../examples/${EXAMPLE_NAME}.txt -e $NUM_ELIM -v -10 -o /dev/stderr 2>&1 > /dev/null)
 
 # diff output with stored result
 diff <(echo "$OUT1") <(tar -xOzf ./results/${EXAMPLE_NAME}${POSTFIX}.out.txt.tar.gz)
@@ -21,7 +21,7 @@ diff <(echo "$OUT1") <(tar -xOzf ./results/${EXAMPLE_NAME}${POSTFIX}.out.txt.tar
 RETVAL1=$?
 
 # run with max. spairs equal to 0
-OUT2=$(${BINARY_DIR}/gamba -i ../examples/${EXAMPLE_NAME}.txt -e $NUM_ELIM -o /dev/stderr --max-spairs=0 2>&1 > /dev/null)
+OUT2=$(${BINARY_DIR}/gamba -i ../examples/${EXAMPLE_NAME}.txt -e $NUM_ELIM -v -10 -o /dev/stderr --max-spairs=0 2>&1 > /dev/null)
 
 # diff output with stored result
 diff <(echo "$OUT2") <(tar -xOzf ./results/${EXAMPLE_NAME}${POSTFIX}.out.txt.tar.gz)

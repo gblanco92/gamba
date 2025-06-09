@@ -18,12 +18,6 @@
 
 #include <string>
 
-#ifdef PROFILE
-#    define GAMBA_PROFILE(code) code
-#else
-#    define GAMBA_PROFILE(code)
-#endif
-
 /*
 Profile parts of the execution using the following 'perf' flags:
     --control=fifo:{$m_ctl_filename},{$m_ack_filename}
@@ -33,36 +27,31 @@ Profile parts of the execution using the following 'perf' flags:
 namespace gamba
 {
 
-class perf_linux_profiler
+class profiler
 {
     static void create_fifo(std::string const& filename);
 
 public:
-    /* do not use constructor to setup due to the global singleton */
-    void setup();
+    static void init();
 
-    ~perf_linux_profiler();
+    static void destroy() noexcept;
 
     /*  call to start recording events with 'perf'*/
-    void enable_profiling();
+    static void enable_profiling();
 
     /* call to stop recording events with 'perf' */
-    void disable_profiling();
+    static void disable_profiling();
 
 private:
     /* 0 file discriptor should correspond to stdin */
-    int m_ctl_fd{0};
-    int m_ack_fd{0};
+    static int m_ctl_fd;
+    static int m_ack_fd;
 
     /* only to read the 'ack' string */
-    char m_buffer[10]{};
+    static char m_buffer[10];
 
     constexpr static char const* m_ctl_filename = "/tmp/perf_ctl.fifo";
     constexpr static char const* m_ack_filename = "/tmp/perf_ack.fifo";
 };
-
-#ifdef PROFILE
-extern perf_linux_profiler perf;
-#endif
 
 }  // namespace gamba

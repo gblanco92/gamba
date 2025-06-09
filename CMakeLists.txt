@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     GamBa
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "A Groebner basis engine"
     HOMEPAGE_URL "https://github.com/gblanco92/GamBa"
     LANGUAGES CXX
@@ -47,91 +47,111 @@ set(CPUINFO_LIBRARY_TYPE "static" CACHE BOOL "Built only an static library")
 
 FetchContent_MakeAvailable(CpuInfo)
 
+#target_compile_features(CpuInfo PRIVATE cxx_std_23)
+#set_target_properties(CpuInfo PROPERTIES CXX_STANDARD_REQUIRED ON)
+#set_target_properties(CpuInfo PROPERTIES CXX_EXTENSIONS OFF)
+
 FetchContent_Declare(
-        cli11_proj
+        cli11
         QUIET
         GIT_REPOSITORY  "https://github.com/CLIUtils/CLI11"
-        GIT_TAG         v2.4.2
+        GIT_TAG         v2.5.0
 )
 
-FetchContent_MakeAvailable(cli11_proj)
+FetchContent_MakeAvailable(cli11)
+
+FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY  "https://github.com/fmtlib/fmt"
+        GIT_TAG         11.1.4
+        BINARY_DIR      ${CMAKE_BINARY_DIR}/fmt/
+) 
+
+FetchContent_MakeAvailable(fmt)
+
+# ----------------------
+
+set(GamBa_SRCS source/basis.cpp
+               source/base_basis.cpp
+               source/f4.cpp
+               source/gamba.cpp
+               source/gb_main.cpp
+               source/thirdparty/getRSS.cpp
+               source/io.cpp
+               source/kernel/avx2/u16/echelon_u16.cpp
+               source/kernel/avx2/u32/echelon_u32.cpp
+               source/kernel/avx2/find.cpp
+               source/kernel/avx2/u16/misc_u16.cpp
+               source/kernel/avx2/u32/misc_u32.cpp
+               source/kernel/magic.cpp
+               source/kernel/avx2/u16/modular_u16.cpp
+               source/kernel/avx2/u32/modular_u32.cpp
+               source/kernel/avx2/u16/reduce_u16.cpp
+               source/kernel/avx2/u32/reduce_u32.cpp
+               source/kernel/avx2/saxpy.cpp
+               source/linalg.cpp
+               source/linalg_v3.cpp
+               source/linalg_pack.cpp
+               source/main.cpp
+               source/matrix.cpp
+               source/memalign.cpp
+               source/modular.cpp
+               source/params.cpp
+               source/profile.cpp
+               source/reduce.cpp
+               source/spair.cpp
+               source/stats.cpp
+               source/update.cpp
+               source/utils.cpp)
 
 # ---- Declare library ----
 
-##add_library(
-##    GamBa_lib OBJECT
-##    source/gamba.cpp
-##)
-##
-##target_include_directories(
-##    GamBa_lib ${warning_guard}
-##    PUBLIC
-##    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/source>"
-##)
-##
-##target_compile_features(GamBa_lib PUBLIC cxx_std_23)
+##add_library(GamBa_lib OBJECT source/gamba.cpp)
+##target_include_directories(GamBa_lib PUBLIC ${PROJECT_SOURCE_DIR}/source)
+##set_target_properties(GamBa_lib PROPERTIES OUTPUT_NAME gamba)
 
 # ---- Declare executable ----
 
-add_executable(GamBa_exe source/debug.cpp
-                         source/f4.cpp
-                         source/gamba.cpp
-                         source/getRSS.cpp
-                         source/io.cpp
-                         source/kernel/echelon_u16.cpp
-                         source/kernel/echelon_u32.cpp
-                         source/kernel/find.cpp
-                         source/kernel/misc_u16.cpp
-                         source/kernel/misc_u32.cpp
-                         source/kernel/modular_u16.cpp
-                         source/kernel/modular_u32.cpp
-                         source/kernel/reduce_u16.cpp
-                         source/kernel/reduce_u32.cpp
-                         source/kernel/saxpy.cpp
-                         source/main.cpp
-                         source/params.cpp
-                         source/profile.cpp
-                         source/stats.cpp)
-
+add_executable(GamBa_exe ${GamBa_SRCS})
 target_include_directories(GamBa_exe PUBLIC ${PROJECT_SOURCE_DIR}/source)
-
-add_executable(GamBa::exe ALIAS GamBa_exe)
-
-# ---- Target properties ----
-
 set_target_properties(GamBa_exe PROPERTIES OUTPUT_NAME gamba)
 
+# ---- Link libraries ----
+
 target_link_libraries(GamBa_exe PUBLIC git_version)
-
-target_link_libraries(GamBa_exe PRIVATE cpuinfo CLI11::CLI11)
-
-target_link_libraries(GamBa_exe PRIVATE libgmp.a libgmpxx.a)
+target_link_libraries(GamBa_exe PRIVATE cpuinfo CLI11::CLI11 fmt::fmt)
+target_link_libraries(GamBa_exe PRIVATE libgmp.a libgmpxx.a libmpfr.a libflint.a)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   target_link_libraries(GamBa_exe PRIVATE libc++.a libc++abi.a)
 endif()
 
 #target_link_libraries(GamBa_exe PRIVATE tcmalloc_minimal.a)
-
 #target_link_libraries(GamBa_exe PRIVATE jemalloc.a)
 
+# ---- Compile features ----
+
 target_compile_features(GamBa_exe PRIVATE cxx_std_23)
-
 set_target_properties(GamBa_exe PROPERTIES CXX_STANDARD_REQUIRED ON)
-
 set_target_properties(GamBa_exe PROPERTIES CXX_EXTENSIONS OFF)
+
+target_compile_features(fmt PRIVATE cxx_std_23)
+set_target_properties(fmt PROPERTIES CXX_STANDARD_REQUIRED ON)
+set_target_properties(fmt PROPERTIES CXX_EXTENSIONS OFF)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "ReleaseDebug")
   set_target_properties(GamBa_exe PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+  set_target_properties(fmt PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+
+  set_target_properties(GamBa_exe PROPERTIES UNITY_BUILD ON)
+  set_target_properties(GamBa_exe PROPERTIES UNITY_BUILD_MODE GROUP)
+  set_target_properties(GamBa_exe PROPERTIES UNITY_BUILD_UNIQUE_ID "GAMBA_UNITY_BUILD")
+  set_source_files_properties(${GamBa_SRCS} PROPERTIES UNITY_GROUP "gamba")
 endif()
 
-# ---- Target flags ----
+# ---- Mandatory flags ----
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=core-avx2 -mno-vzeroupper")
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-endif()
+target_compile_options(GamBa_exe PRIVATE -march=core-avx2 -mno-vzeroupper)
 
 # ---- Precompiled headers ----
 
@@ -145,7 +165,6 @@ target_precompile_headers(GamBa_exe PRIVATE
                           <cmath>
                           <cpuinfo.h>
                           <concepts>
-                          <cpuinfo.h>
                           <cstddef>
                           <cstdint>
                           <cstdio>
@@ -153,6 +172,21 @@ target_precompile_headers(GamBa_exe PRIVATE
                           <cstring>
                           <ctime>
                           <fcntl.h>
+                          <flint/flint.h>
+                          <flint/fmpz.h>
+                          <flint/fmpq.h>
+                          <fmt/base.h>
+                          <fmt/format.h>
+                          <fmt/ranges.h>
+                          <fmt/chrono.h>
+                          <fmt/std.h>
+                          <fmt/compile.h>
+                          <fmt/color.h>
+                          <fmt/os.h>
+                          <fmt/ostream.h>
+                          <fmt/args.h>
+                          <fmt/printf.h>
+                          <fmt/xchar.h>
                           <format>
                           <fstream>
                           <gmpxx.h>

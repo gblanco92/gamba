@@ -18,274 +18,159 @@
 
 #include <algorithm>
 #include <chrono>
-#include <iomanip>
-#include <iostream>
-#include <limits>
+#include <memory>
 #include <ranges>
-#include <utility>
 #include <vector>
 
 #include <gmpxx.h>
 
+#include "alloc_poly.hpp"
+#include "base_basis.hpp"
 #include "config.hpp"
-#include "container.hpp"
-#include "divmask.hpp"
 #include "field.hpp"
 #include "io.hpp"
-#include "monomial.hpp"
-#include "order.hpp"
+#include "logger.hpp"
+#include "matrix.hpp"
 #include "stats.hpp"
+#include "utils.hpp"
 
 namespace gamba
 {
 
-template <class CoefficientType, class MonomialOrder>
-class polynomial_basis
+template <class CoefficientType>
+class polynomial_basis : public base_polynomial_basis
 {
 public:
-    using coeff_type     = CoefficientType;
-    using coeff_type_ptr = coeff_type const*;
-    using monomial_order = MonomialOrder;
+    using coeff_type      = CoefficientType;
+    using coeff_ptr_type  = coeff_type const*;
+    using coeff_vect_type = std::span<coeff_type>;
 
-    using monomial_context = basis_hashtable;
-    using monomial_type    = monomial<monomial_context, monomial_order>;
-    using monomial_init    = typename monomial_type::monomial_init_t;
+    polynomial_basis(size_t const n_vars, uint32_t const fld_chr) :
+            base_polynomial_basis{n_vars, fld_chr},
+            field{fld_chr}
+    {}
 
-    using hash_type      = typename monomial_type::hash_type;
-    using degree_type    = typename monomial_type::degree_type;
-    using index_type     = typename monomial_type::index_type;
-    using index_type_ptr = index_type const*;
-
-    using length_type = uint32_t;
-    using count_type  = uint32_t;
-
-    using divmap_type = divmask_map<monomial_order, monomial_type>;
-
-    using matrix_monomial_context = matrix_hashtable;
-    using matrix_monomial_type =
-        monomial<matrix_monomial_context, monomial_order>;
-
-    using monomial_vect_type = std::span<monomial_type>;
-    using index_vect_type    = std::span<index_type>;
-    using coeff_vect_type    = std::span<coeff_type>;
+    /* make all template specialization friends of each other so we can access
+     * the private construtor below */
+    template <class OtherCoefficientType>
+    friend class polynomial_basis;
 
 private:
-    static constexpr auto is_divisible =
-        monomial_type::template check_monomial_division_divmask<
-            monomial_context>;
+    /* this constructor *must* be private since the resulting basis is partially
+     * constructed; only used when reducing a QQ basis modulo a prime number */
+    explicit polynomial_basis(uint32_t const prime) :
+            base_polynomial_basis(prime),  // only sets m_field_char = prime
+            field{prime}
+    {}
 
 public:
-    polynomial_basis(size_t const n_vars, uint32_t const fld_chr);
-
-    ~polynomial_basis();
+    ~polynomial_basis() override;
 
     /* make this class non-copyable */
     polynomial_basis(polynomial_basis const&)            = delete;
     polynomial_basis& operator=(polynomial_basis const&) = delete;
 
+    polynomial_basis(polynomial_basis&&) noexcept            = default;
+    polynomial_basis& operator=(polynomial_basis&&) noexcept = default;
+
     void clear();
 
-    /* access member functions */
-    size_t num_gens() const { return m_num_gens; }
-
-    length_type length(size_t const i) const
-    {
-        return static_cast<length_type>(m_mons[i].size());
-    }
-
-    degree_type degree(size_t const i) const { return m_degs[i]; }
-
-    monomial_type lead_mon(size_t const i) const { return m_mons[i][0]; }
-
-    divmask_type lead_sdm(size_t const i) const { return m_lead_sdm[i]; }
-
-    std::vector<index_type> const& reduced_indices() const
-    {
-        return m_reduced_gens;
-    }
-
-    bool is_redundant(size_t const i) const { return m_redundant[i]; }
-
-    bool is_deleted(size_t const i) const
-    {
-        return m_redundant[i] and m_spair_count[i] == 0;
-    }
-
-    size_t num_nondel_gens() const { return m_num_nondel_gens; }
-
-    index_type nondel_gen_idx(size_t const i) const { return m_nondel_gens[i]; }
-
-    bool is_trivial() const { return m_trivial; }
-
-    divmap_type const& divmap() const { return m_divmap; }
-
-    monomial_vect_type const& monomials(size_t const i) const
-    {
-        return m_mons[i];
-    }
+    double memory_usage() const;
 
     coeff_vect_type const& coefficients(size_t const i) const
     {
         return m_coefs[i];
     }
 
-    size_t divmasks_version() const { return m_divmasks_version; }
+    void_ptr_type v_coefficients(size_t const i) const override
+    {
+        return m_coefs[i].data();
+    }
 
-    count_type& spair_count(size_t const i) { return m_spair_count[i]; }
-
-    static std::pair<monomial_type*, coeff_type*> allocate_polynomial(
-        size_t const num_terms);
-
-    void import_generators(generators_data const& data);
-
-    /* after an update process enforce the following invariant:
-     *  redundant[reduced_lm[i]] == false */
-    void update_reduced_gens(size_t const prev_num_gens);
-
-    template <class MatrixType>
-    void insert_new_rows_reduce(MatrixType& matrix);
-
-    template <class MatrixType2>
-    void insert_new_rows_echelon(MatrixType2& matrix);
-
-    void remove_redundant_gens();
-
-    void update_deleted_gens();
-
-    /* I/O and info member functions */
-#if defined DEBUG
-    void write_generators(std::ostream& os) const;
+#ifdef DEBUG_GAMBA
+    template <class MonomialOrder>
+    void print_generators(MonomialOrder /*unused*/) const;
 #endif
 
-    void export_generators(generators_data& data) /*const*/;
+    void export_generators(generators_data& data) const;
 
-    void print_info(std::ostream& os) const;
+    template <class MonomialOrder>
+    void import_generators(generators_data const& data,
+                           MonomialOrder /*unused*/);
 
-    double memory_usage() const;
+    template <class MonomialOrder>
+    void insert_new_rows_reduce(matrix_f4& matrix, MonomialOrder /*unused*/);
+
+    template <class MonomialOrder>
+    void insert_new_rows_echelon(matrix_f4& matrix, MonomialOrder /*unused*/);
+
+    template <class ModularCoefficientType>
+    std::pair<polynomial_basis<ModularCoefficientType>, bool> modular_reduction(
+        uint32_t const prime) /*const*/;
+
+    void cleanup_modular_basis();
 
 private:
+    template <class MonomialOrder>
     void import_generator(size_t const i, generators_data const& data);
 
+    template <class MonomialOrder>
     void import_matrix_row(index_vect_type& row,
-                           coeff_vect_type const& cfs,
+                           coeff_type* const cfs,
                            std::vector<matrix_monomial_type> const& col_to_mon);
 
 public:
-    /* number of variables in the polynomial ring */
-    size_t const num_vars;
-
     /* field metadata */
     field_traits<coeff_type> const field;
 
 private:
-    /* numer of total generators (non-reduced) in the basis */
-    size_t m_num_gens{};
-
-    /* index of the hashed monomials in the monomial set */
-    std::vector<monomial_vect_type> m_mons{};
-
-    /* coefs[i][j] corresponds to the coeff. of the mon. index by mons[i][j] */
+    /* coefs[i][j] corresponds to the coeff. of the monomial in mons[i][j] */
     std::vector<coeff_vect_type> m_coefs{};
-
-    /* unordered (flat) set storing all monomials appearing in the basis */
-    monomial_set<monomial_type> m_mon_set{};
-
-    /* total degree of each polynomial in the basis */
-    std::vector<degree_type> m_degs{};
-
-    /* divisibility mask for each generator's leading monomial */
-    std::vector<divmask_type> m_lead_sdm{};
-
-    /* helper class to generate the divisibility masks */
-    divmap_type m_divmap;
-
-    /* version of divmap used in the computation of current lead_sdm */
-    size_t m_divmasks_version{0UL};
-
-    /* polynomials of the basis made redundant by G-M update; make it aligned so
-     * it can be updated concurrently, avoid std::vector<bool> specialization */
-    aligned_vector<uint8_t> m_redundant{};
-
-    /* keeps the index of top reduced polynomials in the basis; this means that
-     * for all index i: redundant[reduced_lm[i]] == false for all i */
-    std::vector<index_type> m_reduced_gens{};
-
-    /* number of non-deleted generators in the basis; a generators is marked as
-     * deleted if it is redundant and does not appear in an spair */
-    size_t m_num_nondel_gens{};
-
-    /* number of spairs where the i-th polynomial of the basis appears */
-    std::vector<count_type> m_spair_count{};
-
-    /* if a generator is not deleted this maps it to its relative index within
-     * the non-deleted generators; otherwise is infinity */
-    std::vector<index_type> m_nondel_gens{};
-
-    /* whether the basis is homogeneous or not */
-    bool m_is_homogeneous{};
-
-    /* the ideal is trivial */
-    bool m_trivial{false};
 };
 
-template <class CoefficientType, class MonomialOrder>
-polynomial_basis<CoefficientType, MonomialOrder>::polynomial_basis(
-    size_t const n_vars,
-    uint32_t const fld_chr) :
-        num_vars{n_vars},
-
-        field{fld_chr},
-
-        m_divmap{n_vars}
-{}
-
-template <class CoefficientType, class MonomialOrder>
-polynomial_basis<CoefficientType, MonomialOrder>::~polynomial_basis()
+template <class CoefficientType>
+polynomial_basis<CoefficientType>::~polynomial_basis()
 {
-    for (auto& gen_mons : m_mons)
-        delete[] gen_mons.data();
+    /* memory was initialized via a placement new in std::uninitialized_copy */
+    if constexpr (std::is_same_v<coeff_type, mpq_class>)
+    {
+        for (coeff_vect_type const& cfs : m_coefs)
+            std::ranges::destroy(cfs);
+    }
+
+    /* deallocate mons./coefs. memory via the coefficients pointers */
+    for (coeff_vect_type const& cfs : m_coefs)
+        ::operator delete(cfs.data());
 }
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::clear()
+template <class CoefficientType>
+void polynomial_basis<CoefficientType>::clear()
 {
-    m_num_gens = 0UL;
+    this->base_polynomial_basis::clear();
 
-    for (auto& gen_mons : m_mons)
-        delete[] gen_mons.data();
+    /* memory was initialized via a placement new in std::uninitialized_copy */
+    if constexpr (std::is_same_v<coeff_type, mpq_class>)
+    {
+        for (coeff_vect_type const& cfs : m_coefs)
+            std::ranges::destroy(cfs);
+    }
 
-    m_mons.clear();
-    m_mons.shrink_to_fit();
+    /* deallocate mons./coefs. memory via the coefficients pointers */
+    for (coeff_vect_type const& cfs : m_coefs)
+    {
+        if (not cfs.empty())
+            ::operator delete(cfs.data());
+    }
 
     m_coefs.clear();
     m_coefs.shrink_to_fit();
-
-    m_mon_set.clear();
-
-    m_degs.clear();
-    m_degs.shrink_to_fit();
-
-    m_lead_sdm.clear();
-    m_lead_sdm.shrink_to_fit();
-
-    m_redundant.clear();
-    m_redundant.shrink_to_fit();
-
-    m_reduced_gens.clear();
-    m_reduced_gens.shrink_to_fit();
-
-    m_num_nondel_gens = 0UL;
-
-    m_spair_count.clear();
-    m_spair_count.shrink_to_fit();
-
-    m_nondel_gens.clear();
-    m_nondel_gens.shrink_to_fit();
 }
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::import_generators(
-    generators_data const& data)
+template <class CoefficientType>
+template <class MonomialOrder>
+void polynomial_basis<CoefficientType>::import_generators(
+    generators_data const& data,
+    MonomialOrder /*unused*/)
 { /*
    * The import process consists of the following steps:
    * 1. Allocate memory for all the generators.
@@ -300,37 +185,38 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_generators(
    * 10. Check if the genereting set is homogeneous.
    * 11. Generate divisibility masks for all monomials in the basis.
    */
+    using monomial_order = MonomialOrder;
+
     m_num_gens = data.num_gens;
 
     m_coefs.resize(m_num_gens);
     m_mons.resize(m_num_gens);
     m_degs.resize(m_num_gens);
-    m_mon_set.reserve(HASHTABLE_INIT_SIZE);
+    m_mon_set->reserve(HASHTABLE_INIT_SIZE);
 
     for (size_t idx = 0; idx < m_num_gens; ++idx)
-        import_generator(idx, data);
+        import_generator<monomial_order>(idx, data);
+
+    auto generators       = std::views::zip(m_mons, m_coefs, m_degs);
+    auto const gens_begin = std::ranges::cbegin(generators);
 
     /* remove empty generators */
-    auto generators           = std::views::zip(m_mons, m_coefs, m_degs);
     auto const [new_end, end] = std::ranges::remove(
         generators, 0, [](auto const& p) { return get_mons(p).size(); });
 
-    auto const gens_begin = std::ranges::cbegin(generators);
-
-    /* deallocate before removal */
+    /* deallocate before erasing */
     for (auto const& gen : std::ranges::subrange{new_end, end})
-        delete[] get_mon(gen).data();
+        ::operator delete(get_coef(gen).data());
+
+    ssize_t const new_size = std::distance(gens_begin, new_end);
 
     /* do the actual removal */
-    m_mons.erase(std::cbegin(m_mons) + (new_end - gens_begin),
-                 std::cend(m_mons));
-    m_coefs.erase(std::cbegin(m_coefs) + (new_end - gens_begin),
-                  std::cend(m_coefs));
-    m_degs.erase(std::cbegin(m_degs) + (new_end - gens_begin),
-                 std::cend(m_degs));
+    m_mons.erase(std::cbegin(m_mons) + new_size, std::cend(m_mons));
+    m_coefs.erase(std::cbegin(m_coefs) + new_size, std::cend(m_coefs));
+    m_degs.erase(std::cbegin(m_degs) + new_size, std::cend(m_degs));
 
     /* true number of generators after removing empty generators */
-    m_num_gens = m_mons.size();
+    m_num_gens = static_cast<size_t>(new_size);
 
     /* resize directly data that is constant for all new generators */
     m_redundant.resize(m_num_gens, false);
@@ -338,8 +224,8 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_generators(
 
     m_num_nondel_gens = m_num_gens;
 
-    /* in the begining no generator is marked as deleted */
     m_nondel_gens.resize(m_num_gens);
+    /* at the begining no generator is marked as deleted */
     std::iota(std::begin(m_nondel_gens), std::end(m_nondel_gens), 0U);
 
     generators = std::views::zip(m_mons, m_coefs, m_degs);
@@ -356,65 +242,40 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_generators(
 
     /* helper lambda to check if a single polynomials is homogeneous */
     auto const is_homogeneous = [](auto const& poly) {
-        return std::ranges::all_of(get_mons(poly),
-                                   [&poly](monomial_type const mon) {
-                                       return mon.degree() == get_deg(poly);
-                                   });
+        return std::ranges::all_of(
+            get_mons(poly), [&poly](monomial_type const mon) {
+                return monomial_order::degree(mon) == get_deg(poly);
+            });
     };
 
     /* check if the basis is homogeneous after all the cleaning */
     m_is_homogeneous = std::ranges::all_of(generators, is_homogeneous);
 
     /* generate divisibility masks after importing generators into basis */
-    m_divmap.update_map(m_mon_set);
+    m_divmap->update_map(*m_mon_set);
 
     m_lead_sdm.resize(m_num_gens);
     /* compute divmask for each leading term in new basis */
     for (size_t i = 0; i < m_num_gens; ++i)
     {
         monomial_type const lm = m_mons[i][0];
-        m_lead_sdm[i]          = m_divmap.compute_divmask(lm);
+        m_lead_sdm[i]          = m_divmap->compute_divmask(lm);
     }
 
-    m_divmasks_version = m_divmap.version();
+    m_divmasks_version = m_divmap->version();
 }
 
-template <class CoefficientType, class MonomialOrder>
-std::pair<
-    typename polynomial_basis<CoefficientType, MonomialOrder>::monomial_type*,
-    typename polynomial_basis<CoefficientType, MonomialOrder>::coeff_type*>
-polynomial_basis<CoefficientType, MonomialOrder>::allocate_polynomial(
-    size_t const num_terms)
-{
-    constexpr size_t const std_align = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
-
-    size_t const num_bytes_mons  = num_terms * sizeof(monomial_type);
-    size_t const num_bytes_coefs = num_terms * sizeof(coeff_type);
-    size_t const num_bytes_padd  = padding<std_align>(num_bytes_mons);
-
-    size_t const num_bytes = num_bytes_mons + num_bytes_coefs + num_bytes_padd;
-    size_t const offset_bytes = num_bytes_mons + num_bytes_padd;
-
-    /* allocate monomials & coefficients in a single allocation */
-    auto* mem_ptr = new char[num_bytes];
-    auto* mon_ptr = reinterpret_cast<monomial_type*>(mem_ptr);
-    auto* cfs_ptr = reinterpret_cast<coeff_type*>(mem_ptr + offset_bytes);
-
-    /* both memory blocks have the same alignment as if allocated separately */
-    assert(reinterpret_cast<std::uintptr_t>(mem_ptr) % std_align == 0);
-    assert(reinterpret_cast<std::uintptr_t>(cfs_ptr) % std_align == 0);
-
-    return std::make_pair(mon_ptr, cfs_ptr);
-}
-
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::import_generator(
+template <class CoefficientType>
+template <class MonomialOrder>
+void polynomial_basis<CoefficientType>::import_generator(
     size_t const i,
     generators_data const& data)
 {
+    using monomial_order = MonomialOrder;
+
     size_t const num_terms = data.lens[i];
 
-    auto const [mon_ptr, cfs_ptr] = allocate_polynomial(num_terms);
+    auto const [mon_ptr, cfs_ptr] = allocate_polynomial<coeff_type>(num_terms);
 
     m_mons[i]  = {mon_ptr, num_terms};
     m_coefs[i] = {cfs_ptr, num_terms};
@@ -425,21 +286,24 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_generator(
     for (size_t j = 0; j < num_terms; ++j)
     {
         /* convert input monomial into own format & compute hash value */
-        auto const mon = monomial_init::construct(
-            &data.exps[num_vars * (offset + j)], num_vars);
+        auto const mon =
+            monomial_init::construct(&data.exps[m_num_vars * (offset + j)],
+                                     m_num_vars, params::num_elim_vars);
 
         /* insert monomial in basis hash table */
-        auto const [it, _] = m_mon_set.insert(mon);
+        auto const [it, _] = m_mon_set->insert(mon);
 
         /* copy monomial into generator vector */
         m_mons[i][j] = *it;
     }
 
     /* import generators coefficients */
-    if constexpr (std::is_same_v<coeff_type, mpz_class>)
+    if constexpr (std::is_same_v<coeff_type, mpq_class>)
     {
-        std::copy(&data.coeffs[offset], &data.coeffs[offset + data.lens[i]],
-                  m_coefs[i].data());
+        /* allocate_polynomial returns uninitialized memory */
+        std::uninitialized_copy(&data.coeffs[offset],
+                                &data.coeffs[offset + data.lens[i]],
+                                m_coefs[i].data());
     }
     else
     {
@@ -465,12 +329,16 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_generator(
 
     auto const poly_begin = std::ranges::begin(poly);
 
-    /* remove repeated coefficients/monomials */
+    /* remove repeated terms */
     auto const [new_end0, _0] = std::ranges::unique(poly, {}, get_mon);
 
-    /* remove zero coefficients */
+    /* remove zero terms */
     auto const [new_end, _] =
         std::ranges::remove(poly_begin, new_end0, 0, get_coef);
+
+    /* free mpz integers before shrinking the polynomial's size */
+    if constexpr (std::is_same_v<coeff_type, mpq_class>)
+        std::destroy(&get_coef(*new_end), &get_coef(*new_end0));
 
     /* new size after all simplifications */
     auto const new_size =
@@ -484,174 +352,55 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_generator(
     if (new_size == 0)
         return;
 
-    /* normalize coefs: if char > 0 make monic, if char = 0 remove content */
-    if constexpr (std::is_same_v<coeff_type, mpz_class>)
+    /* normalize coefs by making them monic */
+    coeff_type const inv = field.inverse(m_coefs[i][0]);
+
+    if (inv != 1)
     {
-        mpz_class const gcd0 = std::accumulate(
-            std::begin(m_coefs[i]), std::end(m_coefs[i]), mpz_class{0},
-            [](mpz_class const& acc, mpz_class const& c) {
-                return gcd(acc, c);
-            });
-
-        /* remove content from rational coefficients */
-        std::ranges::for_each(m_coefs[i], [&gcd0](mpz_class& c) { c /= gcd0; });
-    }
-    else
-    {
-        coeff_type const inv = field.inverse(m_coefs[i][0]);
-
-        /* make polynomial monic */
-        std::ranges::for_each(m_coefs[i], [inv, this](coeff_type& c) {
-            c = field.multiply(c, inv);
-        });
-
-        assert(m_coefs[i][0] == 1);
+        std::ranges::transform(
+            m_coefs[i], std::begin(m_coefs[i]),
+            [inv, this](coeff_type& c) { return field.multiply(c, inv); });
     }
 
-    /* transform mod p coefs to modular space *after* normalization */
-    if constexpr (not std::is_same_v<coeff_type, mpz_class>)
-    {
-        std::transform(std::begin(m_coefs[i]), std::end(m_coefs[i]),
-                       std::begin(m_coefs[i]), [this](coeff_type const x) {
-                           return field.transform(x);
-                       });
-    }
-    assert(m_coefs[i][0] == field.r);
+    assert(m_coefs[i][0] == 1);
 
-    /* compute degree after all simplifications */
+    /* transform mod p coefficients to Montgomery space */
+    if constexpr (not std::is_same_v<coeff_type, mpq_class>)
+    {
+        std::ranges::transform(
+            m_coefs[i], std::begin(m_coefs[i]),
+            [this](coeff_type const c) { return field.transform(c); });
+
+        assert(m_coefs[i][0] == field.r);
+    }
+
+    /* compute degrees after all simplifications */
     if constexpr (is_degree_order_v<monomial_order>)
     {
-        m_degs[i] = m_mons[i][0].degree();
+        m_degs[i] = monomial_order::degree(m_mons[i][0]);
     }
     else
     {
         auto const it = std::ranges::max_element(
-            m_mons[i], {},
-            [](monomial_type const mon) { return mon.degree(); });
+            m_mons[i], {}, [](monomial_type const mon) {
+                return monomial_order::degree(mon);
+            });
 
         m_degs[i] = it->degree();
     }
 
     if (m_degs[i] == 0)
-        m_trivial = true;
+        m_is_trivial = true;
 }
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::update_reduced_gens(
-    size_t const prev_num_gens)
+template <class CoefficientType>
+template <class MonomialOrder>
+void polynomial_basis<CoefficientType>::insert_new_rows_reduce(
+    matrix_f4& matrix,
+    MonomialOrder /*unused*/)
 {
-    size_t num_old_redundant = 0;
+    using monomial_order = MonomialOrder;
 
-    // TODO: parallel, each loop iteration is independent of each other;
-    /* check redundancy of old reduced elements in the basis */
-    for (index_type const red_idx : m_reduced_gens)
-    {
-        /* previous reduced elements in basis cannot be already redundant */
-        assert(not m_redundant[red_idx]);
-
-        monomial_type const lm_ri = lead_mon(red_idx);
-        divmask_type const sdm_ri = lead_sdm(red_idx);
-
-        [[maybe_unused]] degree_type const deg_ri = degree(red_idx);
-        [[maybe_unused]] degree_type const deg_lm_ri =
-            monomial_order::degree(lm_ri);
-
-        /* if there exist an element from current round dividing the old
-         * i-th element, the i-th element can be made redundant */
-        for (size_t j = prev_num_gens; j < m_num_gens; ++j)
-        {
-            monomial_type const lm_j = lead_mon(j);
-            divmask_type const sdm_j = lead_sdm(j);
-
-            [[maybe_unused]] degree_type const deg_j = degree(j);
-            [[maybe_unused]] degree_type const deg_lm_j =
-                monomial_order::degree(lm_j);
-
-            if (is_divisible(lm_j, sdm_j, lm_ri, sdm_ri))
-            {
-#if NONDEG_ORDERS_HEURISTIC
-                if constexpr (not is_degree_order_v<monomial_order>)
-                {
-                    if (deg_ri - deg_lm_ri < deg_j - deg_lm_j)
-                        continue;
-                }
-#endif
-                m_redundant[red_idx] = true;
-                num_old_redundant++;
-
-                break;
-            }
-        }
-    }
-
-    // TODO: parallel, each loop iteration is independent of each other
-    /* check redundancy of element from the same update batch */
-    for (size_t i = prev_num_gens; i < m_num_gens; ++i)
-    {
-        monomial_type const lm_i = lead_mon(i);
-        divmask_type const sdm_i = lead_sdm(i);
-
-        [[maybe_unused]] degree_type const deg_i = degree(i);
-        [[maybe_unused]] degree_type const deg_lm_i =
-            monomial_order::degree(lm_i);
-
-        /* if there exist an element updated later that divides the current i-th
-         * element, the i-th element can be made redundant */
-        for (size_t j = i + 1; j < m_num_gens; ++j)
-        {
-            monomial_type const lm_j = lead_mon(j);
-            divmask_type const sdm_j = lead_sdm(j);
-
-            [[maybe_unused]] degree_type const deg_j = degree(j);
-            [[maybe_unused]] degree_type const deg_lm_j =
-                monomial_order::degree(lm_j);
-
-            if (is_divisible(lm_j, sdm_j, lm_i, sdm_i))
-            {
-#if NONDEG_ORDERS_HEURISTIC
-                if constexpr (not is_degree_order_v<monomial_order>)
-                {
-                    if (deg_i - deg_lm_i < deg_j - deg_lm_j)
-                        continue;
-                }
-#endif
-                m_redundant[i] = true;
-
-                break;
-            }
-        }
-    }
-
-    /* avoid unnecessary copying if there no redundant elements are found */
-    if (num_old_redundant > 0)
-    {
-        /* remove redundant elements from the old reduced part */
-        auto const new_end = std::remove_if(
-            std::begin(m_reduced_gens), std::end(m_reduced_gens),
-            [this](index_type const idx) { return m_redundant[idx]; });
-
-        m_reduced_gens.erase(new_end, std::cend(m_reduced_gens));
-
-        /* reserve enough memory for the new top reduced elements */
-        m_reduced_gens.reserve(m_reduced_gens.size() + m_num_gens
-                               - prev_num_gens);
-    }
-
-    /* store the indices of non-redundant new elements in the basis */
-    std::ranges::copy_if(
-        std::views::iota(prev_num_gens, m_num_gens),
-        std::back_inserter(m_reduced_gens),
-        [this](size_t const idx) { return not m_redundant[idx]; });
-
-    stats.redundant_elem =
-        static_cast<ssize_t>(m_num_gens - m_reduced_gens.size());
-}
-
-template <class CoefficientType, class MonomialOrder>
-template <class MatrixType>
-void polynomial_basis<CoefficientType, MonomialOrder>::insert_new_rows_reduce(
-    MatrixType& matrix)
-{
     /* timings */
     auto const start_cputime  = std::clock();
     auto const start_walltime = std::chrono::system_clock::now();
@@ -661,7 +410,7 @@ void polynomial_basis<CoefficientType, MonomialOrder>::insert_new_rows_reduce(
     assert(m_coefs.size() == 0);
     assert(m_redundant.empty());
 
-    m_num_gens = matrix.m_bottom_rows.size();
+    m_num_gens = matrix.num_bottom_rows();
 
     /* all generators are non-reduced after reduce phase */
     m_redundant.resize(m_num_gens, false);
@@ -674,29 +423,36 @@ void polynomial_basis<CoefficientType, MonomialOrder>::insert_new_rows_reduce(
     m_degs.reserve(m_num_gens);
 
     /* rows come presorted from the reduce phase */
-    for (size_t i = 0; i < matrix.m_bottom_rows.size(); ++i)
+    for (size_t i = 0; i < m_num_gens; ++i)
     {
         index_vect_type& row = matrix.m_new_rows[i];
-        coeff_vect_type& cfs = matrix.m_new_coefs[i];
+        void_ptr_type vcfs   = matrix.m_new_coefs[i];
 
-        import_matrix_row(row, cfs, matrix.m_col_to_mon);
+        /* basis class must be able to modify coefficients */
+        auto* const vcfs_ = const_cast<void*>(vcfs);  // NOLINT
+        auto* const cfs   = reinterpret_cast<coeff_type*>(vcfs_);
+
+        import_matrix_row<monomial_order>(row, cfs, matrix.m_col_to_mon);
     }
 
     /* timings */
     auto const end_cputime  = std::clock();
     auto const end_walltime = std::chrono::system_clock::now();
 
-    stats.insert_walltime +=
+    stats::insert_walltime +=
         std::chrono::duration<double>(end_walltime - start_walltime).count();
-    stats.insert_cputime +=
+    stats::insert_cputime +=
         static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
 }
 
-template <class CoefficientType, class MonomialOrder>
-template <class MatrixType>
-void polynomial_basis<CoefficientType, MonomialOrder>::insert_new_rows_echelon(
-    MatrixType& matrix)
+template <class CoefficientType>
+template <class MonomialOrder>
+void polynomial_basis<CoefficientType>::insert_new_rows_echelon(
+    matrix_f4& matrix,
+    MonomialOrder /*unused*/)
 {
+    using monomial_order = MonomialOrder;
+
     /* timings */
     auto const start_cputime  = std::clock();
     auto const start_walltime = std::chrono::system_clock::now();
@@ -732,58 +488,65 @@ void polynomial_basis<CoefficientType, MonomialOrder>::insert_new_rows_echelon(
 #endif
     {
         index_vect_type& row = matrix.m_new_rows[i];
-        coeff_vect_type& cfs = matrix.m_new_coefs[i];
+        void_ptr_type vcfs   = matrix.m_new_coefs[i];
 
-        import_matrix_row(row, cfs, matrix.m_col_to_mon);
+        /* basis class must be able to modify coefficients */
+        auto* const vcfs_ = const_cast<void*>(vcfs);  // NOLINT
+        auto* const cfs   = reinterpret_cast<coeff_type*>(vcfs_);
+
+        import_matrix_row<monomial_order>(row, cfs, matrix.m_col_to_mon);
     }
 
     matrix.clear();
 
     /* update div. masks after importing new generators into basis */
-    m_divmap.update_map(m_mon_set);
+    m_divmap->update_map(*m_mon_set);
 
     m_lead_sdm.resize(m_num_gens);
 
     /* only update sdm of previous generators if new divmap version */
     size_t const start_idx =
-        m_divmap.version() != m_divmasks_version ? 0UL : prev_num_gens;
+        m_divmap->version() != m_divmasks_version ? 0UL : prev_num_gens;
 
     /* update divmask of leading monomials for all generators since spairs
      * can depend on non-reduced generators */
     for (size_t i = start_idx; i < m_num_gens; ++i)
     {
         monomial_type const lm = m_mons[i][0];
-        m_lead_sdm[i]          = m_divmap.compute_divmask(lm);
+        m_lead_sdm[i]          = m_divmap->compute_divmask(lm);
     }
 
-    m_divmasks_version = m_divmap.version();
+    m_divmasks_version = m_divmap->version();
 
     /* timings */
     auto const end_cputime  = std::clock();
     auto const end_walltime = std::chrono::system_clock::now();
 
-    stats.insert_walltime +=
+    stats::insert_walltime +=
         std::chrono::duration<double>(end_walltime - start_walltime).count();
-    stats.insert_cputime +=
+    stats::insert_cputime +=
         static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
 }
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::import_matrix_row(
-    polynomial_basis<CoefficientType, MonomialOrder>::index_vect_type& row,
-    polynomial_basis<CoefficientType, MonomialOrder>::coeff_vect_type const&
-        cfs,
+template <class CoefficientType>
+template <class MonomialOrder>
+void polynomial_basis<CoefficientType>::import_matrix_row(
+    polynomial_basis<CoefficientType>::index_vect_type& row,
+    polynomial_basis<CoefficientType>::coeff_type* const cfs,
     std::vector<matrix_monomial_type> const& col_to_mon)
 {
+    using monomial_order = MonomialOrder;
+
     size_t const num_terms = row.size();
 
-    auto const ind_ptr = reinterpret_cast<index_type_ptr>(row.data());
-    auto const mon_ptr = reinterpret_cast<monomial_type*>(row.data());
+    auto const* const ind_ptr = reinterpret_cast<index_ptr_type>(row.data());
+    auto* const mon_ptr       = reinterpret_cast<monomial_type*>(row.data());
 
     monomial_vect_type mons = {mon_ptr, num_terms};
 
     for (size_t i = 0; i < num_terms; ++i)
     {
+        assert(ind_ptr[i] < col_to_mon.size());
         /* undo the columns <-> monomials transformation */
         matrix_monomial_type mat_mon = col_to_mon[ind_ptr[i]];
 
@@ -791,154 +554,191 @@ void polynomial_basis<CoefficientType, MonomialOrder>::import_matrix_row(
         auto const mon = monomial_init::copy(mat_mon);
 
         /* insert basis monomial into basis hash table */
-        auto const [it, _] = m_mon_set.insert(mon);
+        auto const [it, _] = m_mon_set->insert(mon);
 
         /* copy monomial to generator vector */
         mons[i] = *it;
     }
 
     m_mons.emplace_back(mons);
-    m_coefs.emplace_back(cfs);
+    m_coefs.emplace_back(cfs, num_terms);
 
     /* compute degree of new generator */
     if constexpr (is_degree_order_v<monomial_order>)
     {
-        m_degs.emplace_back(m_mons.back()[0].degree());
+        m_degs.emplace_back(monomial_order::degree(m_mons.back()[0]));
     }
     else
     {
         auto const it = std::ranges::max_element(
-            m_mons.back(), {},
-            [](monomial_type const mon) { return mon.degree(); });
+            m_mons.back(), {}, [](monomial_type const mon) {
+                return monomial_order::degree(mon);
+            });
 
         m_degs.emplace_back(it->degree());
     }
 
     if (m_degs.back() == 0)
-        m_trivial = true;
+        m_is_trivial = true;
 }
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::remove_redundant_gens()
+template <>
+template <class ModularCoefficientType>
+std::pair<polynomial_basis<ModularCoefficientType>, bool>
+polynomial_basis<mpq_class>::modular_reduction(uint32_t const prime) /*const*/
 {
-    /* when inserting elements into the basis in decreasing order of leading
-     * monomial the Gebauer-Moeller installation ensures that the leading
-     * monomials of the final basis are already reduced; if a different order is
-     * chosen generators the non-reduced lead mons. must be removed manually */
-#if INSERT_ELEMENTS_DECREASING == 0
-    constexpr bool const remove_redundant = true;
-    /* if the non-redundant heuristic for non-degree orderings is enable AND the
-     * order is non-degree we must remove potencial redudant generators */
-#elif NONDEG_ORDERS_HEURISTIC == 1
-    constexpr bool const remove_redundant =
-        not is_degree_order_v<MonomialOrder>;
-#else
-    constexpr bool const remove_redundant = false;
-#endif
+    using mod_coeff_type      = ModularCoefficientType;
+    using mod_basis_type      = polynomial_basis<mod_coeff_type>;
+    using mod_coeff_vect_type = mod_basis_type::coeff_vect_type;
+    /* make sure prime number fits in the requested coefficient type */
+    assert(prime < std::numeric_limits<mod_coeff_type>::max());
+    /* absolute maximum supported field characteristic is 2^31 - 1 */
+    assert(prime <= std::numeric_limits<int32_t>::max());
 
-    if constexpr (not remove_redundant)
-        return;
-
-    size_t num_redundant = 0;
-
-    /* remove redundant elements in final non-reduced Groebner basis */
-    for (index_type const i : m_reduced_gens)
+    /* first update the lead_sdm if 'divmap' has been updated by other bases */
+    if (m_divmasks_version != m_divmap->version())
     {
-        /* reduced elements in basis cannot be already redundant */
-        assert(not m_redundant[i]);
-
-        monomial_type const lm_ri = lead_mon(i);
-        divmask_type const sdm_ri = lead_sdm(i);
-
-        /* check if there is a reduced element in the basis dividing the i-th
-         * reduced element (different from itself) */
-        for (index_type const j : m_reduced_gens)
+        for (size_t i = 0; i < m_num_gens; ++i)
         {
-            if (j == i)
-                continue;
-
-            if (is_divisible(lead_mon(j), lead_sdm(j), lm_ri, sdm_ri))
-            {
-                m_redundant[i] = true;
-                num_redundant++;
-
-                break;
-            }
-        }
-    }
-
-    if (num_redundant > 0)
-    {
-        /* do the actual removal of redundant elements indices */
-        auto const new_end = std::remove_if(
-            std::begin(m_reduced_gens), std::end(m_reduced_gens),
-            [this](index_type const idx) { return m_redundant[idx]; });
-
-        m_reduced_gens.erase(new_end, std::cend(m_reduced_gens));
-    }
-
-    stats.redundant_elem =
-        static_cast<ssize_t>(m_num_gens - m_reduced_gens.size());
-}
-
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::update_deleted_gens()
-{
-    /* dummy value representing non-deleted generators */
-    constexpr index_type const infty = std::numeric_limits<index_type>::max();
-
-    m_num_nondel_gens = 0UL;
-
-    for (size_t i = 0; i < m_num_gens; ++i)
-    {
-        m_nondel_gens[i] =
-            (is_deleted(i) ? infty
-                           : static_cast<index_type>(m_num_nondel_gens++));
-    }
-}
-
-#if defined DEBUG
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::write_generators(
-    std::ostream& os) const
-{
-    for (size_t i = 0; i < m_num_gens; ++i)
-    {
-        os << "#" << i << ": deg = " << m_degs[i] << ", ";
-
-        for (size_t j = 0; j < m_mons[i].size(); ++j)
-        {
-            std::string const& mon_str = monomial2string(m_mons[i][j]);
-
-            os << (j != 0 ? " + " : "") << static_cast<uint64_t>(m_coefs[i][j]);
-            os << (mon_str.empty() ? "" : "*") << mon_str;
+            monomial_type const lm = m_mons[i][0];
+            m_lead_sdm[i]          = m_divmap->compute_divmask(lm);
         }
 
-        os << std::endl;
+        m_divmasks_version = m_divmap->version();
+    }
+
+    /* partially construct new basis modulo the given prime */
+    polynomial_basis<mod_coeff_type> basis_modp{prime};
+    field_traits<mod_coeff_type> const& field_modp = basis_modp.field;
+
+    /* set base_polynomial_basis member variables */
+    basis_modp.m_num_vars = m_num_vars;
+    basis_modp.m_num_gens = m_num_gens;
+    basis_modp.m_mon_set  = m_mon_set;
+    basis_modp.m_mons     = m_mons;  // share monomials
+    basis_modp.m_degs     = m_degs;
+
+    basis_modp.m_divmap           = m_divmap;
+    basis_modp.m_lead_sdm         = m_lead_sdm;
+    basis_modp.m_divmasks_version = m_divmasks_version;
+
+    basis_modp.m_redundant       = m_redundant;
+    basis_modp.m_reduced_gens    = m_reduced_gens;
+    basis_modp.m_num_nondel_gens = m_num_gens;
+    basis_modp.m_spair_count     = m_spair_count;
+    basis_modp.m_nondel_gens     = m_nondel_gens;
+
+    /* the definition of bad prime implies these flags don't change */
+    basis_modp.m_is_homogeneous = m_is_homogeneous;
+    basis_modp.m_is_trivial     = m_is_trivial;
+
+    bool is_bad_prime = false;
+
+    basis_modp.m_coefs.reserve(m_num_gens);
+    /* reduce coefs. modulo the given prime & move them to Montgomery space */
+    for (size_t i = 0; i < m_num_gens; ++i)
+    {
+        coeff_vect_type const& cfs = m_coefs[i];
+
+        /* allocate memory *only* for mod p coefficients */
+        size_t const num_terms = cfs.size();
+        void* vcfs_ptr = ::operator new(num_terms * sizeof(mod_coeff_type));
+        auto* const cfs_ptr = reinterpret_cast<mod_coeff_type*>(vcfs_ptr);
+
+        mod_coeff_vect_type& cfs_modp =
+            basis_modp.m_coefs.emplace_back(cfs_ptr, num_terms);
+
+        /* do the actual reduction modulo the given prime */
+        std::ranges::transform(
+            cfs, std::begin(cfs_modp), [&field_modp](mpq_class const& c) {
+                uint32_t const a = field_modp.modular_reduce(c.get_num());
+                uint32_t const b = field_modp.modular_reduce(c.get_den());
+                return field_modp.multiply(a, field_modp.inverse(b));
+            });
+
+        /* modular reduced polynomials are already monic */
+        assert(cfs_modp[0] == 1);
+
+        /* a prime is bad if it divides any coefficient of the bais */
+        is_bad_prime = std::ranges::any_of(
+            cfs_modp, [](mod_coeff_type const c) { return c == 0; });
+
+        /* early break, return a partially constructed basis */
+        if (is_bad_prime)
+            break;
+
+        /* transform mod p coefficients to Montgomery space */
+        std::ranges::transform(cfs_modp, std::begin(cfs_modp),
+                               [&field_modp](mod_coeff_type const c) {
+                                   return field_modp.transform(c);
+                               });
+
+        assert(cfs_modp[0] == basis_modp.field.r);
+    }
+
+    return std::make_pair(std::move(basis_modp), is_bad_prime);
+}
+
+#ifdef DEBUG_GAMBA
+template <class CoefficientType>
+template <class MonomialOrder>
+void polynomial_basis<CoefficientType>::print_generators(
+    MonomialOrder /*unused*/) const
+{
+    using monomial_order = MonomialOrder;
+
+    for (size_t idx = 0; idx < m_num_gens; ++idx)
+    {
+        std::string gen_str;
+        gen_str += fmt::format("#{}: deg = {}, ", idx, m_degs[idx]);
+
+        for (size_t j = 0; j < m_mons[idx].size(); ++j)
+        {
+            std::string const& mon_str =
+                monomial2string<monomial_type, monomial_order>(m_mons[idx][j]);
+
+            gen_str += (j != 0 ? " + " : "");
+
+            if constexpr (std::is_same_v<coeff_type, mpq_class>)
+                m_coefs[idx][j].set_str(gen_str, 10);
+            else
+                gen_str += fmt::format("{:d}", m_coefs[idx][j]);
+
+            gen_str += (mon_str.empty() ? "" : "*") + mon_str;
+        }
+
+        log::print(log::DEBG, "{}\n", gen_str);
     }
 }
 #endif
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::export_generators(
-    generators_data& data) /*const*/
+template <class CoefficientType>
+void polynomial_basis<CoefficientType>::export_generators(
+    generators_data& data) const
 {
     using var_type     = generators_data::var_type;
     using coeff_p_type = generators_data::coeff_p_type;
 
     size_t const num_red_gens = m_reduced_gens.size();
 
-    data.num_vars   = static_cast<var_type>(num_vars);
-    data.field_char = static_cast<var_type>(field.n);
+    data.num_vars   = static_cast<var_type>(m_num_vars);
+    data.field_char = static_cast<var_type>(m_field_char);
     data.num_gens   = static_cast<var_type>(num_red_gens);
 
     size_t const num_mons = std::accumulate(
         std::cbegin(m_mons), std::cend(m_mons), 0ULL,
         [](size_t acc, auto const& v) { return acc + v.size(); });
 
-    data.coeffs_modp.resize(num_mons);
-    // data.coeffs.resize(num_mons); // TODO: char = 0
-    data.exps.resize(num_mons * num_vars);
+    if constexpr (std::is_same_v<coeff_type, mpq_class>)
+    {
+        data.coeffs.resize(num_mons);
+    }
+    else
+    {
+        data.coeffs_modp.resize(num_mons);
+    }
+
+    data.exps.resize(num_mons * m_num_vars);
     data.lens.resize(data.num_gens);
 
     /* write generators in increasing order of leading monomial */
@@ -946,23 +746,22 @@ void polynomial_basis<CoefficientType, MonomialOrder>::export_generators(
     {
         size_t const idx = m_reduced_gens[i];
 
-        /* transform mod p coefs from modular space */
-        if constexpr (not std::is_same_v<coeff_type, mpz_class>)
-        {
-            std::transform(std::begin(m_coefs[idx]), std::end(m_coefs[idx]),
-                           std::begin(m_coefs[idx]),
-                           [this](coeff_type const x) {
-                               return field.reduce_normalize(x);
-                           });
-        }
-
         for (size_t j = 0; j < m_mons[idx].size(); ++j)
         {
             monomial2exponent(m_mons[idx][j],
-                              &data.exps[(offset + j) * num_vars]);
+                              &data.exps[(offset + j) * m_num_vars]);
 
-            data.coeffs_modp[offset + j] =
-                static_cast<coeff_p_type>(m_coefs[idx][j]);
+            if constexpr (std::is_same_v<coeff_type, mpq_class>)
+            {
+                data.coeffs[offset + j] = m_coefs[idx][j];
+            }
+            else
+            {
+                /* transform mod p coefficients from Montgomery space */
+                coeff_type const c = field.reduce_normalize(m_coefs[idx][j]);
+
+                data.coeffs_modp[offset + j] = static_cast<coeff_p_type>(c);
+            }
         }
 
         data.lens[i] = m_mons[idx].size();
@@ -971,66 +770,39 @@ void polynomial_basis<CoefficientType, MonomialOrder>::export_generators(
     }
 }
 
-template <class CoefficientType, class MonomialOrder>
-void polynomial_basis<CoefficientType, MonomialOrder>::print_info(
-    std::ostream& os) const
+template <class CoefficientType>
+void polynomial_basis<CoefficientType>::cleanup_modular_basis()
 {
-    size_t const num_mons = std::accumulate(
-        std::cbegin(m_mons), std::cend(m_mons), 0ULL,
-        [](size_t acc, auto const& v) { return acc + v.size(); });
+    static_assert(not std::is_same_v<CoefficientType, mpq_class>);
 
-    auto const max_degree_poly =
-        std::max_element(std::cbegin(m_degs), std::cend(m_degs));
-
-    size_t const max_degree = (max_degree_poly != std::cend(m_degs)
-                                   ? *max_degree_poly
-                                   : std::numeric_limits<degree_type>::max());
-
-    auto const dnum_gens = static_cast<double>(m_num_gens);
-    auto const dnum_mon  = static_cast<double>(num_mons);
-
-    os << "************ BASIS INFO ************" << std::endl;
-    os << std::setw(25) << std::left << "num. variables:" << num_vars
-       << std::endl;
-    os << std::setw(25) << std::left
-       << "field charac.:" << static_cast<uint64_t>(field.n) << std::endl;
-    os << std::setw(25) << std::left << "num. generators:" << m_num_gens
-       << std::endl;
-    os << std::setw(25) << std::left << "num. monomials:" << num_mons
-       << std::endl;
-    os << std::setw(25) << std::left << "avg. length:" << dnum_mon / dnum_gens
-       << std::endl;
-    os << std::setw(25) << std::left << "max. degree:" << max_degree
-       << std::endl;
-    os << std::setw(25) << std::left << "homogeneous:" << std::boolalpha
-       << m_is_homogeneous << std::endl;
-    os << "************************************" << std::endl;
+    for (size_t i = 0; i < m_num_gens; ++i)
+    {
+        if (m_redundant[i])
+        {
+            /* clear unusued memory from redundant generators */
+            ::operator delete(m_coefs[i].data());
+            m_coefs[i] = coeff_vect_type{};
+            m_mons[i]  = monomial_vect_type{};
+        }
+        else
+        {
+            /* transform mod p coefficients out of Montgomery space */
+            for (size_t j = 0; j < m_mons[i].size(); ++j)
+                m_coefs[i][j] = field.reduce_normalize(m_coefs[i][j]);
+        }
+    }
 }
 
-template <class CoefficientType, class MonomialOrder>
-double polynomial_basis<CoefficientType, MonomialOrder>::memory_usage() const
+template <class CoefficientType>
+double polynomial_basis<CoefficientType>::memory_usage() const
 {
-    double mem_size = 0.0;
+    double mem_size = base_polynomial_basis::memory_usage();
 
     mem_size += memory_size(m_coefs);
-    mem_size += memory_size(m_mons);
     for (size_t i = 0; i < m_num_gens; ++i)
     {
         mem_size += memory_size(m_coefs[i]);
-        mem_size += memory_size(m_mons[i]);
     }
-
-    mem_size += m_mon_set.memory_usage();
-
-    mem_size += memory_size(m_degs);
-
-    mem_size += memory_size(m_redundant);
-
-    mem_size += memory_size(m_reduced_gens);
-
-    mem_size += memory_size(m_spair_count);
-
-    mem_size += memory_size(m_nondel_gens);
 
     return mem_size;
 }

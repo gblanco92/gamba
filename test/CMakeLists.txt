@@ -576,12 +576,20 @@ add_test(NAME GamBa_test_RK_4_4_8
 
 # Edge cases
 
-add_test(NAME GamBa_test_zero_ideal
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} zero-ideal
+add_test(NAME GamBa_test_zero_ideal_3
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} zero-ideal-3
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
-add_test(NAME GamBa_test_one_ideal
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} one-ideal
+add_test(NAME GamBa_test_one_ideal_3
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} one-ideal-3
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_zero_ideal_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} zero-ideal-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_one_ideal_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} one-ideal-0
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 # Lexicographical order

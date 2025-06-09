@@ -14,109 +14,195 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
+#include <numbers>
+
 #include "stats.hpp"
+
+#include "logger.hpp"
 
 namespace gamba
 {
 
-/* use a global singleton for logging statistics during the computation,
- * not the best approach but it will work for now */
-f4_statistics stats{};
+double stats::update_cputime{0.0};
+double stats::update_walltime{0.0};
 
-void print_timings()
+double stats::select_cputime{0.0};
+double stats::select_walltime{0.0};
+
+double stats::matrix_cputime{0.0};
+double stats::matrix_walltime{0.0};
+
+double stats::symbolic_cputime{0.0};
+double stats::symbolic_walltime{0.0};
+
+double stats::convert_cputime{0.0};
+double stats::convert_walltime{0.0};
+
+double stats::linalg_cputime{0.0};
+double stats::linalg_walltime{0.0};
+
+double stats::insert_cputime{0.0};
+double stats::insert_walltime{0.0};
+
+double stats::reduce_cputime{0.0};
+double stats::reduce_walltime{0.0};
+
+double stats::linalg_interred_cputime{0.0};
+double stats::linalg_interred_walltime{0.0};
+
+double stats::reconstruct_cputime{0.0};
+double stats::reconstruct_walltime{0.0};
+
+double stats::overall_cputime{0.0};
+double stats::overall_walltime{0.0};
+
+ssize_t stats::spairs_reduced{0};
+
+ssize_t stats::gm_criteria{0};
+
+ssize_t stats::redundant_elem{0};
+
+size_t stats::rows_reduced{0};
+
+size_t stats::zero_reductions{0};
+
+size_t stats::max_size_bht{0};
+size_t stats::max_size_sht{0};
+size_t stats::max_size_mht{0};
+
+size_t stats::num_primes{0};
+
+void stats::print_timings()
 {
-    std::cout << std::endl;
-    std::cout << "*************** TIMINGS ***************" << std::endl;
-    std::cout << std::format("overall (wall) {:>20.2f} sec",
-                             stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "\n┌{0:─^{1}}┐\n", " TIMINGS ", 38);
 
-    std::cout << std::format("overall (cpu) {:>14.2f} sec {:5.1f}x",
-                             stats.overall_cputime,
-                             stats.overall_cputime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ overall (wall) {:>17.2f} sec │\n",
+               overall_walltime);
 
-    std::cout << std::format(
-        "matrix const. {:>14.2f} sec {:5.1f}%",
-        stats.matrix_walltime + stats.select_walltime,
-        100.0 * (stats.matrix_walltime + stats.select_walltime)
-            / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ overall (cpu) {:>11.2f} sec {:5.1f}x │\n",
+               overall_cputime, overall_cputime / overall_walltime);
 
-    std::cout << std::format(
-        "symbolic prep. {:>13.2f} sec {:5.1f}%", stats.symbolic_walltime,
-        100.0 * stats.symbolic_walltime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ matrix const. {:>11.2f} sec {:5.1f}% │\n",
+               matrix_walltime + select_walltime,
+               100.0 * (matrix_walltime + select_walltime) / overall_walltime);
 
-    std::cout << std::format(
-        "convert cols {:15.2f} sec {:5.1f}%", stats.convert_walltime,
-        100.0 * stats.convert_walltime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ symbolic prep. {:>10.2f} sec {:5.1f}% │\n",
+               symbolic_walltime, 100.0 * symbolic_walltime / overall_walltime);
 
-    std::cout << std::format(
-        "linear algebra {:13.2f} sec {:5.1f}%", stats.linalg_walltime,
-        100.0 * stats.linalg_walltime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ convert cols. {:>11.2f} sec {:5.1f}% │\n",
+               convert_walltime, 100.0 * convert_walltime / overall_walltime);
 
-    std::cout << std::format(
-        "insert rows {:16.2f} sec {:5.1f}%", stats.insert_walltime,
-        100.0 * stats.insert_walltime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ linear algebra {:10.2f} sec {:5.1f}% │\n",
+               linalg_walltime, 100.0 * linalg_walltime / overall_walltime);
 
-    std::cout << std::format(
-        "update spairs {:14.2f} sec {:5.1f}%", stats.update_walltime,
-        100.0 * stats.update_walltime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ insert rows {:13.2f} sec {:5.1f}% │\n",
+               insert_walltime, 100.0 * insert_walltime / overall_walltime);
 
-    std::cout << std::format(
-        "reduce basis {:15.2f} sec {:5.1f}%", stats.reduce_walltime,
-        100.0 * stats.reduce_walltime / stats.overall_walltime)
-              << std::endl;
+    log::print(log::INFO1, "│ update spairs {:11.2f} sec {:5.1f}% │\n",
+               update_walltime, 100.0 * update_walltime / overall_walltime);
 
-    std::cout << "***************************************" << std::endl;
+    log::print(log::INFO1, "│ reduce basis {:12.2f} sec {:5.1f}% │\n",
+               reduce_walltime, 100.0 * reduce_walltime / overall_walltime);
+
+    if (reconstruct_walltime > 0.0)
+    {
+        log::print(log::INFO1, "│ rational recon. {:9.2f} sec {:5.1f}% │\n",
+                   reconstruct_walltime,
+                   100.0 * reconstruct_walltime / overall_walltime);
+    }
+
+    log::print(log::INFO1, "└{0:─^{1}}┘\n", "", 38);
 }
 
-void print_statistics()
+void stats::print_statistics()
 {
-    std::cout << std::endl;
-    std::cout << "*************** F4 DATA ***************" << std::endl;
+    log::print(log::INFO1, "\n┌{0:─^{1}}┐\n", " STATISTICS ", 38);
 
-    std::cout << std::format("num. spairs reduced {:>19}", stats.spairs_reduced)
-              << std::endl;
+    log::print(log::INFO1, "│ num. spairs reduced {:>16} │\n", spairs_reduced);
 
-    std::cout << std::format("num. GM criterion {:>21}", stats.gm_criteria)
-              << std::endl;
+    log::print(log::INFO1, "│ num. GM criterion {:>18} │\n", gm_criteria);
 
-    std::cout << std::format("num. redundant elem. {:>18}",
-                             stats.redundant_elem)
-              << std::endl;
+    log::print(log::INFO1, "│ num. redundant elem. {:>15} │\n", redundant_elem);
 
-    std::cout << std::format("num. rows reduced {:>21}", stats.rows_reduced)
-              << std::endl;
+    log::print(log::INFO1, "│ num. rows reduced {:>18} │\n", rows_reduced);
 
-    std::cout << std::format("num. zero reductions {:>18}",
-                             stats.zero_reductions)
-              << std::endl;
+    log::print(log::INFO1, "│ num. zero reductions {:>15} │\n",
+               zero_reductions);
 
-    std::cout << std::format(
-        "max. size basis ht {0:>18}{1:}", "2^",
-        std::ceil(std::log(static_cast<double>(stats.max_size_bht))
-                  / std::log(2)))
-              << std::endl;
+    log::print(log::INFO1, "│ max. size basis ht {0:>15}{1:} │\n", "2^",
+               std::ceil(std::log(static_cast<double>(max_size_bht))
+                         / std::numbers::ln2));
 
-    std::cout << std::format(
-        "max. size spair ht {0:>18}{1:}", "2^",
-        std::ceil(std::log(static_cast<double>(stats.max_size_sht))
-                  / std::log(2)))
-              << std::endl;
+    log::print(log::INFO1, "│ max. size spair ht {0:>15}{1:} │\n", "2^",
+               std::ceil(std::log(static_cast<double>(max_size_sht))
+                         / std::numbers::ln2));
 
-    std::cout << std::format(
-        "max. size matrix ht {0:>17}{1:}", "2^",
-        std::ceil(std::log(static_cast<double>(stats.max_size_mht))
-                  / std::log(2)))
-              << std::endl;
+    log::print(log::INFO1, "│ max. size matrix ht {0:>14}{1:} │\n", "2^",
+               std::ceil(std::log(static_cast<double>(max_size_mht))
+                         / std::numbers::ln2));
 
-    std::cout << "***************************************" << std::endl;
+    if (num_primes > 0)
+    {
+        log::print(log::INFO1, "│ num. primes used {0:>19} │\n", num_primes);
+    }
+
+    log::print(log::INFO1, "└{0:─^{1}}┘\n", "", 38);
+}
+
+void stats::reset_timings()
+{
+    update_cputime  = 0.0;
+    update_walltime = 0.0;
+
+    select_cputime  = 0.0;
+    select_walltime = 0.0;
+
+    matrix_cputime  = 0.0;
+    matrix_walltime = 0.0;
+
+    symbolic_cputime = 0.0;
+
+    symbolic_walltime = 0.0;
+
+    convert_cputime  = 0.0;
+    convert_walltime = 0.0;
+
+    linalg_cputime  = 0.0;
+    linalg_walltime = 0.0;
+
+    insert_cputime  = 0.0;
+    insert_walltime = 0.0;
+
+    reduce_cputime  = 0.0;
+    reduce_walltime = 0.0;
+
+    linalg_interred_cputime  = 0.0;
+    linalg_interred_walltime = 0.0;
+
+    reconstruct_cputime  = 0.0;
+    reconstruct_walltime = 0.0;
+
+    overall_cputime  = 0.0;
+    overall_walltime = 0.0;
+}
+
+void stats::reset_statistics()
+{
+    spairs_reduced = 0;
+
+    gm_criteria = 0;
+
+    redundant_elem = 0;
+
+    rows_reduced = 0;
+
+    zero_reductions = 0;
+
+    max_size_bht = 0;
+    max_size_sht = 0;
+    max_size_mht = 0;
+
+    num_primes = 0;
 }
 
 }  // namespace gamba

@@ -16,20 +16,16 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdlib>  // posix_memalign
 #include <limits>
 #include <new>
-#include <type_traits>
-
-#include <sys/mman.h>  // madvise
 
 #include "config.hpp"
+#include "memalign.hpp"
 
 namespace gamba
 {
 
-/* Borrowed from: https://stackoverflow.com/questions/60169819/modern-approach-
+/* Modified from: https://stackoverflow.com/questions/60169819/modern-approach-
  * to-making-stdvector-allocate-aligned-memory */
 
 /*
@@ -51,14 +47,10 @@ public:
 
     static constexpr std::align_val_t const alignment{AlignmentInBytes};
 
-    static constexpr std::size_t const huge_page_size{1UL << 21};  // 2 MiB
-
-    /**
-     * This is only necessary because aligned_allocator has a second template
+    /* this is only necessary because aligned_allocator has a second template
      * argument for the alignment that will make the default
      * std::allocator_traits implementation fail during compilation.
-     * @see https://stackoverflow.com/a/48062758/2191065
-     */
+     * @see https://stackoverflow.com/a/48062758/2191065 */
     template <class OtherElementType>
     struct rebind
     {
@@ -85,31 +77,16 @@ public:
 
         size_t const num_bytes = num * sizeof(ElementType);
 
-        int error{0};
-
-        if constexpr (AlignmentInBytes == huge_page_size)
+        if constexpr (AlignmentInBytes == HUGE_PAGE_SIZE)
         {
-            error = posix_memalign(&ptr, huge_page_size, num_bytes);
-
-#ifdef __linux__
-            [[maybe_unused]] int const madvise_error =
-                madvise(ptr, num_bytes, MADV_HUGEPAGE);
-
-            // user's system may not enable kernel CONFIG_TRANSPARENT_HUGEPAGE
-#    ifndef GAMBA_RELEASE
-            if (madvise_error)
-            {
-                throw std::bad_alloc{};
-            }
-#    endif
-#endif
+            ptr = memalign_alloc(num_bytes);
         }
         else
         {
             ptr = ::operator new[](num_bytes, alignment);
         }
 
-        if (error or ptr == nullptr)
+        if (ptr == nullptr)
         {
             throw std::bad_alloc{};
         }
@@ -117,15 +94,17 @@ public:
         return reinterpret_cast<ElementType*>(ptr);
     }
 
-    void deallocate(ElementType* ptr, [[maybe_unused]] size_t num_bytes = 0)
+    void deallocate(ElementType* ptr, [[maybe_unused]] size_t num)
     {
-        if constexpr (AlignmentInBytes == huge_page_size)
+        if constexpr (AlignmentInBytes == HUGE_PAGE_SIZE)
         {
-            free(ptr);
+            size_t const num_bytes = num * sizeof(ElementType);
+
+            memalign_free(ptr, num_bytes);
         }
         else
         {
-            /* According to the C++20 draft n4868 § 17.6.3.3, the delete
+            /* according to the C++20 draft n4868 § 17.6.3.3, the delete
              * operator must be called with the same alignment argument as the
              * new expression. The size argument can be omitted but if present
              * must also be equal to the one used in new. */

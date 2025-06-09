@@ -32,8 +32,8 @@ template <class T>
 class monomial_flat_set
 {};
 
-template <class MonomialContext, class MonomialOrder>
-class monomial_flat_set<monomial<MonomialContext, MonomialOrder>>
+template <class MonomialContext>
+class monomial_flat_set<monomial<MonomialContext>>
 {
     static constexpr double const m_max_load_factor = HASH_LOAD_FACTOR;
     static constexpr size_t const m_inv_max_load_factor =
@@ -44,8 +44,7 @@ class monomial_flat_set<monomial<MonomialContext, MonomialOrder>>
 
 public:
     using monomial_context = MonomialContext;
-    using monomial_order   = MonomialOrder;
-    using monomial_type    = monomial<monomial_context, monomial_order>;
+    using monomial_type    = monomial<monomial_context>;
     using monomial_data    = typename monomial_type::monomial_data_t;
     using monomial_init    = typename monomial_type::monomial_init_t;
     using index_type       = typename monomial_type::index_type;
@@ -133,9 +132,7 @@ public:
     // using hasher          = monomial_hash;
     using key_equal = monomial_equal_to;
 
-    static constexpr size_t const huge_page_size =
-        aligned_allocator<int>::huge_page_size;
-    using allocator_type = aligned_allocator<monomial_type, huge_page_size>;
+    using allocator_type = aligned_allocator<monomial_type, HUGE_PAGE_SIZE>;
 
     using reference       = value_type&;
     using const_reference = value_type const&;
@@ -176,10 +173,7 @@ public:
 
     ~monomial_flat_set()
     {
-        m_size = 0;
-
         m_alloc.deallocate(m_table, m_capacity);
-        m_table = nullptr;
 
         m_alloc_data.deallocate(monomial_type::data_v, m_max_size);
         monomial_type::data_v = nullptr;
@@ -188,7 +182,8 @@ public:
                                 monomial_base::exp_size * m_max_size);
         monomial_type::exps_v = nullptr;
 
-        monomial_type::load = 0;
+        monomial_type::load  = 0;
+        monomial_init::m_exp = nullptr;  // TODO thread_local
     }
 
     size_t size() const
@@ -204,7 +199,7 @@ public:
         /* since we are going to reserve the whole page anyway, make hash table
          * capacity *in bytes* a multiple of the huge page size */
         size_t const huge_capacity =
-            round_up(sizeof(key_type) * capacity, huge_page_size)
+            round_up(sizeof(key_type) * capacity, HUGE_PAGE_SIZE)
             / sizeof(key_type);
 
         /* space for the exponents according to the max_load_factor */
@@ -213,13 +208,13 @@ public:
             rehash_impl(huge_capacity, huge_capacity / m_inv_max_load_factor);
 
             if constexpr (std::is_same_v<monomial_context, basis_hashtable>)
-                stats.max_size_bht = std::max(stats.max_size_bht, m_max_size);
+                stats::max_size_bht = std::max(stats::max_size_bht, m_max_size);
 
             if constexpr (std::is_same_v<monomial_context, spair_hashtable>)
-                stats.max_size_sht = std::max(stats.max_size_sht, m_max_size);
+                stats::max_size_sht = std::max(stats::max_size_sht, m_max_size);
 
             if constexpr (std::is_same_v<monomial_context, matrix_hashtable>)
-                stats.max_size_mht = std::max(stats.max_size_mht, m_max_size);
+                stats::max_size_mht = std::max(stats::max_size_mht, m_max_size);
         }
     }
 
@@ -229,13 +224,13 @@ public:
         rehash(count * m_inv_max_load_factor);
     }
 
-    void prefetch_insert(size_t const hash) const
+    FORCE_INLINE void prefetch_insert(size_t const hash) const
     {
         size_t const k = hash & (m_capacity - 1);
         _mm_prefetch(m_table + k, _MM_HINT_T0);
     }
 
-    std::pair<iterator, bool> insert(monomial_init const mon)
+    FORCE_INLINE std::pair<iterator, bool> insert(monomial_init const mon)
     {
         /* capacity is always a power of two */
         size_t const mod = m_capacity - 1;
@@ -317,7 +312,7 @@ private:
                   monomial_type::dummy());
 
         size_t const mod = m_capacity - 1;
-
+        /* rehash loop */
         for (auto it = cbegin(); it != cend(); ++it)
         {
             size_t k = it->hash(), j = 0;

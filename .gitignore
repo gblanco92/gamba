@@ -14,6 +14,12 @@ CMakeLists.txt.user
 CMakeUserPresets.json
 
 source/linalg.hpp
+source/linalg.cpp
 source/linalg_v3.hpp
+source/linalg_v3.cpp
+source/linalg_pack.hpp
+source/linalg_pack.cpp
 source/config.hpp
 source/kernel/*
+source/modular.hpp
+source/modular.cpp
