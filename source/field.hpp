@@ -22,9 +22,9 @@
 #include <type_traits>
 
 #include <flint/ulong_extras.h>
-#include <gmpxx.h>
 
 #include "montgomery.hpp"
+#include "thirdparty/flintxx.hpp"
 #include "utils.hpp"
 
 namespace gamba
@@ -96,7 +96,7 @@ struct field_traits<UIntT>
         max_fma = std::min(montgomery_max_fma, float_max_fma);
 
         /* force low max_fma during testing */
-        GAMBA_DEBUG(max_fma = 25);
+        GAMBA_DEBUG(max_fma = 50);
     }
 
     integer_type add(integer_type const x, integer_type const y) const
@@ -120,9 +120,9 @@ struct field_traits<UIntT>
         return static_cast<integer_type>(inv);
     }
 
-    integer_type modular_reduce(mpz_class const& x) const
+    integer_type modular_reduce(fmpz_class const& x) const
     {
-        ulong const res = mpz_fdiv_ui(x.get_mpz_t(), n);
+        ulong const res = fmpz_fdiv_ui(x.get_fmpz_t(), n);
 
         return static_cast<integer_type>(res);
     }
@@ -172,21 +172,24 @@ struct field_traits<UIntT>
 };
 
 template <>
-struct field_traits<mpq_class>
+struct field_traits<fmpq_class>
 {
     explicit field_traits([[maybe_unused]] uint32_t const n) { assert(n == 0); }
 
-    static mpq_class add(mpq_class const& x, mpq_class const& y)
+    static fmpq_class add(fmpq_class const& x, fmpq_class const& y)
     {
         return x + y;
     }
 
-    static mpq_class multiply(mpq_class const& x, mpq_class const& y)
+    static fmpq_class multiply(fmpq_class const& x, fmpq_class const& y)
     {
         return x * y;
     }
 
-    static mpq_class inverse(mpq_class const& x) { return 1 / x; }
+    static fmpq_class inverse(fmpq_class const& x) { return 1 / x; }
+
+    /* field characteristic */
+    uint32_t const n{0};
 };
 
 }  // namespace gamba

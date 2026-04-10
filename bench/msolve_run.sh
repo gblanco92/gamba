@@ -22,7 +22,7 @@ if [[ ! $(command -v "$BINARY") ]]; then
 fi
 
 # run the example
-OUTPUT=$(taskset -c 0 "$BINARY" -g 2 -l 44 -v 1 -f "$1" -o /dev/null 2>&1)
+OUTPUT=$(taskset -c 0 "$BINARY" -g 2 -v 1 -l 44 -f "$1" -o /dev/null 2>&1)
 # store return value
 RETVAL=$?
 

@@ -14,6 +14,8 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
+#ifdef PROFILE_GAMBA
+
 #include <cstring>
 
 #include "profile.hpp"
@@ -25,8 +27,6 @@
 
 namespace gamba
 {
-
-#ifdef PROFILE_GAMBA
 
 int profiler::m_ctl_fd{0};
 int profiler::m_ack_fd{0};
@@ -148,6 +148,6 @@ void profiler::disable_profiling()
     }
 }
 
-#endif
-
 }  // namespace gamba
+
+#endif

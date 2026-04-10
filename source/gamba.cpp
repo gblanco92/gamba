@@ -20,12 +20,15 @@
 #include "gamba.hpp"
 
 #include "logger.hpp"
+#include "order.hpp"
+#include "params.hpp"
 
 namespace gamba
 {
 
-template <class CoefficientType, class MonomialOrder>
-generators_data groebner_basis_main(generators_data const& data);  // NOLINT
+template <class CoefficientType>
+generators_data groebner_basis_main(generators_data const& data,
+                                    monomial_order const& mon_order);  // NOLINT
 
 template <class CoefficientType>
 generators_data groebner_basis_mon_order(generators_data const& data)  // NOLINT
@@ -35,14 +38,25 @@ generators_data groebner_basis_mon_order(generators_data const& data)  // NOLINT
     switch (params::mon_order)
     {
         case params::order::grevlex:
-            return groebner_basis_main<coeff_type, order_grevlex>(data);
-#if 0
+
+            return groebner_basis_main<coeff_type>(data, order_grevlex{});
+        case params::order::deglex:
+
+            return groebner_basis_main<coeff_type>(data, order_deglex{});
         case params::order::lexic:
-            return groebner_basis_main<coeff_type, order_lexic>(data, params);
-#endif
+
+            return groebner_basis_main<coeff_type>(data, order_lexic{});
         case params::order::blockelim:
-            return groebner_basis_main<coeff_type, order_blockelim>(data);
+
+            return groebner_basis_main<coeff_type>(data, order_blockelim{});
+        case params::order::grevlexw:
+            /* copy monomial order weights into monomial order class */
+            std::copy(std::begin(params::weights), std::end(params::weights),
+                      std::back_inserter(order_grevlexw::w_));
+
+            return groebner_basis_main<coeff_type>(data, order_grevlexw{});
         default:
+
             throw std::runtime_error{"Monomial order not supported."};
     }
 }
@@ -56,9 +70,12 @@ generators_data groebner_basis(generators_data const& data)
 
     if (data.field_char == 0)
     {
-        throw std::runtime_error{"Rational numbers not supported yet."};
-
-        return groebner_basis_mon_order<mpq_class>(data);
+#if 0
+        return groebner_basis_mon_order<fmpq_class>(data);
+#else
+        throw std::runtime_error(
+            "Groebner bases over the rationals not supported.");
+#endif
     }
 
     if (data.field_char < std::numeric_limits<uint8_t>::max())

@@ -19,6 +19,10 @@
 #include <bit>
 #include <memory>
 
+#if defined(__SSE__)
+#include <immintrin.h>
+#endif
+
 #include "allocator.hpp"
 #include "config.hpp"
 #include "monomial.hpp"
@@ -226,8 +230,11 @@ public:
 
     FORCE_INLINE void prefetch_insert(size_t const hash) const
     {
-        size_t const k = hash & (m_capacity - 1);
+        [[maybe_unused]] size_t const k = hash & (m_capacity - 1);
+
+#if defined(__SSE__)
         _mm_prefetch(m_table + k, _MM_HINT_T0);
+#endif
     }
 
     FORCE_INLINE std::pair<iterator, bool> insert(monomial_init const mon)

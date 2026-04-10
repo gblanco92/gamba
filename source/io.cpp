@@ -17,9 +17,8 @@
 #include "io.hpp"
 
 #include <flint/ulong_extras.h>
-#include <gmpxx.h>
 
-#include "utils.hpp"
+#include "thirdparty/flintxx.hpp"
 
 namespace gamba
 {
@@ -27,24 +26,20 @@ namespace gamba
 namespace
 {
 
-std::string remove_spaces(std::string line)
+void remove_spaces(std::string& line)
 {
     auto is_space = [](unsigned char c) { return std::isspace(c); };
 
     line.erase(std::remove_if(std::begin(line), std::end(line), is_space),
                std::cend(line));
-
-    return line;
 }
 
-std::string remove_trailing_comma(std::string line)
+void remove_trailing_comma(std::string& line)
 {
     auto const pos = line.find_last_of(',');
 
     if (pos != std::string::npos and pos == line.size() - 1)
-        return line.substr(0, pos);
-
-    return line;
+        line.resize(line.size() - 1);
 }
 
 std::string read_term(std::string& line, std::string::iterator& it)
@@ -58,7 +53,7 @@ std::string read_term(std::string& line, std::string::iterator& it)
     return term;
 }
 
-mpq_class term_to_mpq(std::string line, size_t* pos)
+fmpq_class term_to_mpq(std::string line, size_t* pos)
 {
     /* skip and save sign in case the monomial is -x or +y */
     char sign{'\0'};
@@ -75,7 +70,7 @@ mpq_class term_to_mpq(std::string line, size_t* pos)
 
     /* parse the coefficient without the sign */
     std::string const tmp{line, 0, sz};
-    mpq_class cf = (sz == 0) ? mpq_class(1, 1) : mpq_class(tmp, 10);
+    fmpq_class cf = (sz == 0) ? fmpq_class(1, 1) : fmpq_class(tmp, 10);
 
     if (sign == '-')
         cf *= -1;
@@ -88,28 +83,27 @@ mpq_class term_to_mpq(std::string line, size_t* pos)
 
 }  // namespace
 
-void generators_data::read_num_vars(std::istream& infile)
+void generators_data::read_num_vars(std::FILE* infile)
 {
-    std::string line;
-    if (not std::getline(infile, line))
+    if (not getline(&m_line_ptr, &m_size, infile))
         throw std::runtime_error("Input file is empty.");
 
-    line = remove_spaces(line);
-    line = remove_trailing_comma(line);
+    std::string line{m_line_ptr};
+
+    remove_spaces(line);
+    remove_trailing_comma(line);
 
     /* the number of variables is the number of commas + 1 */
     num_vars = static_cast<uint32_t>(
         std::count(std::cbegin(line), std::cend(line), ',') + 1);
 }
 
-void generators_data::read_characteristic(std::istream& infile)
+void generators_data::read_characteristic(std::FILE* infile)
 {
-    std::string line;
-    if (not std::getline(infile, line))
-    {
-        throw std::runtime_error(
-            "Missing line containing field characteristic.");
-    }
+    if (not getline(&m_line_ptr, &m_size, infile))
+        throw std::runtime_error("No line containing field characteristic.");
+
+    std::string line{m_line_ptr, m_size};
 
     uint64_t fc;
     try
@@ -138,27 +132,30 @@ void generators_data::read_characteristic(std::istream& infile)
     field_char = static_cast<uint32_t>(fc);
 }
 
-void generators_data::read_num_generators(std::istream& infile)
+void generators_data::read_num_generators(std::FILE* infile)
 {
-    std::string line;
-    for (num_gens = 0; getline(infile, line, ',');)
+    num_gens = 0;
+
+    while (getline(&m_line_ptr, &m_size, infile) != -1)
     {
+        std::string line{m_line_ptr};
+
         /* check if there are empty lines in the input file */
-        line = remove_spaces(line);
-        line = remove_trailing_comma(line);
+        remove_spaces(line);
+        remove_trailing_comma(line);
 
         if (not line.empty())
             ++num_gens;
     }
 }
 
-void generators_data::read_variable_names(std::istream& infile)
+void generators_data::read_variable_names(std::FILE* infile)
 {
-    std::string line;
-    std::getline(infile, line);
+    getline(&m_line_ptr, &m_size, infile);
+    std::string line{m_line_ptr};
 
-    line = remove_spaces(line);
-    line = remove_trailing_comma(line);
+    remove_spaces(line);
+    remove_trailing_comma(line);
 
     std::istringstream iline{line};
 
@@ -269,7 +266,7 @@ void generators_data::read_generator_line(std::string line,
         }
 
         size_t pos{0};
-        mpq_class cf;
+        fmpq_class cf;
         try
         {
             cf = term_to_mpq(term, &pos);
@@ -317,33 +314,33 @@ void generators_data::read_generator_line(std::string line,
     lens.emplace_back(num_terms);
 }
 
-void generators_data::read_generators(std::istream& infile)
+void generators_data::read_generators(std::FILE* infile)
 {
-    std::string line;
     /* ignore line with field characteristic */
-    getline(infile, line);
+    getline(&m_line_ptr, &m_size, infile);
 
-    for (size_t line_num = 1; getline(infile, line, ','); ++line_num)
+    for (size_t lnum = 1; getline(&m_line_ptr, &m_size, infile) != -1; ++lnum)
     {
-        line = remove_spaces(line);
-        line = remove_trailing_comma(line);
+        std::string line{m_line_ptr};
+
+        remove_spaces(line);
+        remove_trailing_comma(line);
 
         /* skip empty lines in the input file */
         if (line.empty())
             continue;
 
-        read_generator_line(line, line_num);
+        read_generator_line(line, lnum);
     }
 }
 
-void generators_data::read(std::istream& infile)
+void generators_data::read(std::FILE* infile)
 {
     read_num_vars(infile);
     read_characteristic(infile);
     read_num_generators(infile);
 
-    infile.clear();
-    infile.seekg(0);
+    fseek(infile, 0, SEEK_SET);
 
     read_variable_names(infile);
 
@@ -361,19 +358,23 @@ void generators_data::read(std::istream& infile)
         coeffs_modp.resize(coeffs.size());
 
         std::ranges::transform(
-            coeffs, std::begin(coeffs_modp), [this](mpq_class const& c) {
+            coeffs, std::begin(coeffs_modp), [this](fmpq_class const& c) {
                 uint64_t const a =
-                    mpz_fdiv_ui(c.get_num().get_mpz_t(), field_char);
+                    fmpz_fdiv_ui(c.get_num().get_fmpz_t(), field_char);
                 uint64_t const b =
-                    mpz_fdiv_ui(c.get_den().get_mpz_t(), field_char);
+                    fmpz_fdiv_ui(c.get_den().get_fmpz_t(), field_char);
 
                 return n_mulmod2(a, n_invmod(b, field_char), field_char);
             });
     }
+
+    free(m_line_ptr);
+    m_line_ptr = nullptr;
+    m_size     = 0ULL;
 }
 
 template <bool Star>
-bool generators_data::write_monomial(std::ostream& outfile, size_t offset) const
+bool generators_data::write_monomial(std::FILE* outfile, size_t offset) const
 {
     bool flag{true};
 
@@ -383,15 +384,13 @@ bool generators_data::write_monomial(std::ostream& outfile, size_t offset) const
 
         if (exp > 0)
         {
-            if (exp == 1)
-            {
-                outfile << (Star or not flag ? "*" : "") << var_names[k];
-            }
+            if (Star or not flag)
+                fmt::print(outfile, "*{}", var_names[k]);
             else
-            {
-                outfile << (Star or not flag ? "*" : "") << var_names[k] << "^"
-                        << exp;
-            }
+                fmt::print(outfile, "{}", var_names[k]);
+
+            if (exp != 1)
+                fmt::print(outfile, "^{}", exp);
 
             flag = false;
         }
@@ -402,7 +401,7 @@ bool generators_data::write_monomial(std::ostream& outfile, size_t offset) const
 
 template <class CoefficientType>
 void generators_data::write_generators(
-    std::ostream& outfile,
+    std::FILE* outfile,
     std::vector<CoefficientType> const& coeff) const
 {
     for (size_t i = 0, offset = 0; i < num_gens; ++i)
@@ -416,37 +415,51 @@ void generators_data::write_generators(
 
             if (cf != 1 and -cf != 1)
             {
-                outfile << cf;
+                if constexpr (std::is_same_v<CoefficientType, fmpq_class>)
+                {
+                    flint_fprintf(outfile, "%{fmpz}",
+                                  cf.get_num().get_fmpz_t());
+
+                    if (cf.get_den() != 1)
+                        flint_fprintf(outfile, "/%{fmpz}",
+                                      cf.get_den().get_fmpz_t());
+                }
+                else
+                    fmt::print(outfile, "{}", cf);
+
                 write_monomial<true>(outfile, offset + j);
             }
             else
             {
                 if (cf < 0)
-                    outfile << "-";
+                    fmt::print(outfile, "-");
 
                 bool const flag = write_monomial<false>(outfile, offset + j);
                 /* if no coefficient has been printed and the monomial is x^0
                  * print 1 */
                 if (flag == 1)
-                    outfile << "1";
+                    fmt::print(outfile, "1");
             }
 
             if (j != lens[i] - 1 and coeff[offset + j + 1] > 0)
-                outfile << "+";
+                fmt::print(outfile, "+");
         }
 
-        outfile << (i != num_gens - 1 ? "," : "") << std::endl;
+        if (i != num_gens - 1)
+            fmt::print(outfile, ",");
+
+        fmt::print(outfile, "\n");
 
         offset += lens[i];
     }
 }
 
-void generators_data::write(std::ostream& outfile) const
+void generators_data::write(std::FILE* outfile) const
 {
     for (auto const& vname : var_names)
-        outfile << vname << ",";
+        fmt::print(outfile, "{},", vname);
 
-    outfile << std::endl << field_char << std::endl;
+    fmt::print(outfile, "\n{}\n", field_char);
 
     if (field_char > 0)
     {

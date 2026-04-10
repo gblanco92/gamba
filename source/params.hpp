@@ -24,8 +24,10 @@ struct params
     enum class order  // NOLINT
     {
         grevlex,
+        deglex,
         lexic,
-        blockelim
+        blockelim,
+        grevlexw,
     };
 
     static void sanitize_input(size_t const num_vars);
@@ -36,9 +38,15 @@ struct params
 
     static ssize_t max_spairs;
 
+    static std::string mon_order_str;
+
     static order mon_order;
 
     static size_t num_elim_vars;
+
+    static std::vector<uint32_t> weights;
+
+    static bool lead_mons;
 
     static size_t num_threads;
 

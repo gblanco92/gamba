@@ -16,6 +16,8 @@
 
 #include "basis.hpp"
 
+#include "thirdparty/flintxx.hpp"
+
 namespace gamba
 {
 
@@ -23,6 +25,7 @@ namespace gamba
 template class polynomial_basis<uint8_t>;
 template class polynomial_basis<uint16_t>;
 template class polynomial_basis<uint32_t>;
+template class polynomial_basis<fmpq_class>;
 #endif
 
 }  // namespace gamba

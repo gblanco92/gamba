@@ -30,73 +30,25 @@ extern template class linalg_v3<uint8_t>;
 extern template class linalg_v3<uint16_t>;
 extern template class linalg_v3<uint32_t>;
 
-extern template void update_f4<order_grevlex>(spair_set& spairs,
-                                              base_polynomial_basis& basis,
-                                              size_t const prev_num_gens);
-// extern template void update_f4<order_lexic>(spair_set& spairs,
-//                                             base_polynomial_basis& basis,
-//                                             size_t const prev_num_gens);
-extern template void update_f4<order_blockelim>(spair_set& spairs,
-                                                base_polynomial_basis& basis,
-                                                size_t const prev_num_gens);
+extern template void reduce<uint8_t>(polynomial_basis<uint8_t>& basis,
+                                     monomial_order const& mon_basis,
+                                     matrix_f4& matrix);
+extern template void reduce<uint16_t>(polynomial_basis<uint16_t>& basis,
+                                      monomial_order const& mon_basis,
+                                      matrix_f4& matrix);
+extern template void reduce<uint32_t>(polynomial_basis<uint32_t>& basis,
+                                      monomial_order const& mon_basis,
+                                      matrix_f4& matrix);
 
-extern template class std::pair<size_t, size_t> select_spairs<order_grevlex>(
-    spair_set& spairs);
-// extern template class std::pair<size_t, size_t> select_spairs<order_lexic>(
-//     spair_set& spairs);
-extern template class std::pair<size_t, size_t> select_spairs<order_blockelim>(
-    spair_set& spairs);
-
-extern template void reduce<order_grevlex, uint8_t>(
-    polynomial_basis<uint8_t>& basis,
-    matrix_f4& matrix);
-extern template void reduce<order_grevlex, uint16_t>(
-    polynomial_basis<uint16_t>& basis,
-    matrix_f4& matrix);
-extern template void reduce<order_grevlex, uint32_t>(
-    polynomial_basis<uint32_t>& basis,
-    matrix_f4& matrix);
-
-// extern template void reduce<order_lexic, uint8_t>(
-//      polynomial_basis<uint8_t>& basis,
-//      matrix_f4& matrix);
-// extern template void reduce<order_lexic, uint16_t>(
-//      polynomial_basis<uint16_t>& basis,
-//      matrix_f4& matrix);
-// extern template void reduce<order_lexic, uint32_t>(
-//      polynomial_basis<uint32_t>& basis,
-//      matrix_f4& matrix);
-
-extern template void reduce<order_blockelim, uint8_t>(
-    polynomial_basis<uint8_t>& basis,
-    matrix_f4& matrix);
-extern template void reduce<order_blockelim, uint16_t>(
-    polynomial_basis<uint16_t>& basis,
-    matrix_f4& matrix);
-extern template void reduce<order_blockelim, uint32_t>(
-    polynomial_basis<uint32_t>& basis,
-    matrix_f4& matrix);
-
-template void f4_main<order_grevlex, uint8_t>(
-    polynomial_basis<uint8_t>& basis);  // NOFORMAT
-template void f4_main<order_grevlex, uint16_t>(
-    polynomial_basis<uint16_t>& basis);
-template void f4_main<order_grevlex, uint32_t>(
-    polynomial_basis<uint32_t>& basis);
-
-// template void f4_main<order_lexic, uint8_t>(
-//   polynomial_basis<uint8_t>& basis);
-// template void f4_main<order_lexic, uint16_t>(
-//   polynomial_basis<uint16_t>& basis);
-// template void f4_main<order_lexic, uint32_t>(
-//   polynomial_basis<uint32_t>& basis);
-
-template void f4_main<order_blockelim, uint8_t>(
-    polynomial_basis<uint8_t>& basis);
-template void f4_main<order_blockelim, uint16_t>(
-    polynomial_basis<uint16_t>& basis);
-template void f4_main<order_blockelim, uint32_t>(
-    polynomial_basis<uint32_t>& basis);
+template void f4_main<uint8_t>(polynomial_basis<uint8_t>& basis,
+                               monomial_order const& mon_order,
+                               learn_f4_data* learn_data);
+template void f4_main<uint16_t>(polynomial_basis<uint16_t>& basis,
+                                monomial_order const& mon_order,
+                                learn_f4_data* learn_data);
+template void f4_main<uint32_t>(polynomial_basis<uint32_t>& basis,
+                                monomial_order const& mon_order,
+                                learn_f4_data* learn_data);
 #endif
 
 namespace f4
@@ -119,6 +71,16 @@ void print_bottom_line()
         log::print(log::INFO2, "╘{:═^118}╛\n", "");
     else
         log::print(log::INFO2, "╞{:═^118}╡\n", "");
+}
+
+void print_time(std::chrono::duration<double> const time, bool const new_line)
+{
+    log::print(log::INFO2, "{:10.2f} sec", time.count());
+
+    if (new_line)
+        log::print(log::INFO2, " │\n");
+
+    ::fflush(stdout);
 }
 
 }  // namespace f4

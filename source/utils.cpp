@@ -18,6 +18,7 @@
 
 #include <gmp.h>
 
+#include "logger.hpp"
 #include "thirdparty/getRSS.hpp"
 
 namespace gamba
@@ -69,31 +70,21 @@ std::string libflint_version_string()
                        __FLINT_VERSION_PATCHLEVEL);
 }
 
-void print_memory_usage(double const mem_usage)
+void print_memory_usage(double const mem_usage, log::level const lvl)
 {
     if (mem_usage < 1024.0)
-        log::print(log::INFO2, "{:10.2f} MiB", mem_usage);
+        log::print(lvl, "{:10.2f} MiB", mem_usage);
     else
-        log::print(log::INFO2, "{:10.2f} GiB", mem_usage / 1024.0);
+        log::print(lvl, "{:10.2f} GiB", mem_usage / 1024.0);
 }
 
-void print_memory_usage()
+void print_memory_usage(log::level const lvl)
 {
     /* get peak RSS memory usage in mebibytes */
     double const mem_usage =
         static_cast<double>(getPeakRSS()) / 1024.0 / 1024.0;
 
-    print_memory_usage(mem_usage);
-}
-
-void print_time(std::chrono::duration<double> const time, bool const new_line)
-{
-    log::print(log::INFO2, "{:10.2f} sec", time.count());
-
-    if (new_line)
-        log::print(log::INFO2, " │\n");
-
-    ::fflush(stdout);
+    print_memory_usage(mem_usage, lvl);
 }
 
 }  // namespace gamba

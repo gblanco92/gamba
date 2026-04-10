@@ -8,16 +8,17 @@
 # 3. msolve
 # 4. julia
 # 5. maple
-# 6. singular
+# 6. axf4
 
-# Disable Hyperthreading
-echo forceoff | sudo tee /sys/devices/system/cpu/smt/control > /dev/null 2>&1
-# Disable Turbo Boost (Intel)
-echo "1" | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo > /dev/null 2>&1
-# Disable Turbo Boost
-echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost > /dev/null 2>&1
-# Set CPU scaling governor to performance
-sudo cpupower frequency-set -g performance > /dev/null 2>&1
+# Not needed in AMD Zen5
+## # Disable Hyperthreading
+## echo forceoff | sudo tee /sys/devices/system/cpu/smt/control > /dev/null 2>&1
+## # Disable Turbo Boost (Intel)
+## echo "1" | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo > /dev/null 2>&1
+## # Disable Turbo Boost
+## echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost > /dev/null 2>&1
+## # Set CPU scaling governor to performance
+## sudo cpupower frequency-set -g performance > /dev/null 2>&1
 
 # Path to the current script location relative to pwd
 SCRIPT_PATH=$(dirname "${BASH_SOURCE[0]}")

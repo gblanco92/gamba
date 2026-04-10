@@ -37,7 +37,7 @@ RING="R, ($VARS) = polynomial_ring(GF($CHAR), [$VARS2]);";
 # form polynomial basis
 IDEAL="system = [$GENS];";
 # call groebner basis routine
-BASIS="timing = @timed result = groebner(system, ordering=DegRevLex(), linalg=:randomized, threaded=:no);"
+BASIS="timing = @timed result = groebner(system, ordering=DegRevLex(), threaded=:no);"
 
 # input commands (call groebner twice to compile, how stupid...)
 INPUT=$(echo "$IMPORT"$'\n'"$RING"$'\n'"$IDEAL"$'\n'"$BASIS"$'\n'"$BASIS"$'\n'"println(timing.time, \" sec\");"$'\n'"println(timing.bytes, \" bytes\");")

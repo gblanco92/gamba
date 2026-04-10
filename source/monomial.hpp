@@ -21,6 +21,7 @@
 #include <random>
 
 #include "divmask.hpp"
+#include "params.hpp"
 #include "utils.hpp"
 
 namespace gamba

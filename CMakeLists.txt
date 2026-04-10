@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     GamBa
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "A Groebner basis engine"
     HOMEPAGE_URL "https://github.com/gblanco92/GamBa"
     LANGUAGES CXX
@@ -55,7 +55,7 @@ FetchContent_Declare(
         cli11
         QUIET
         GIT_REPOSITORY  "https://github.com/CLIUtils/CLI11"
-        GIT_TAG         v2.5.0
+        GIT_TAG         v2.6.1
 )
 
 FetchContent_MakeAvailable(cli11)
@@ -63,7 +63,7 @@ FetchContent_MakeAvailable(cli11)
 FetchContent_Declare(
         fmt
         GIT_REPOSITORY  "https://github.com/fmtlib/fmt"
-        GIT_TAG         11.1.4
+        GIT_TAG         12.1.0
         BINARY_DIR      ${CMAKE_BINARY_DIR}/fmt/
 ) 
 
@@ -78,17 +78,46 @@ set(GamBa_SRCS source/basis.cpp
                source/gb_main.cpp
                source/thirdparty/getRSS.cpp
                source/io.cpp
-               source/kernel/avx2/u16/echelon_u16.cpp
-               source/kernel/avx2/u32/echelon_u32.cpp
-               source/kernel/avx2/find.cpp
-               source/kernel/avx2/u16/misc_u16.cpp
-               source/kernel/avx2/u32/misc_u32.cpp
                source/kernel/magic.cpp
-               source/kernel/avx2/u16/modular_u16.cpp
-               source/kernel/avx2/u32/modular_u32.cpp
-               source/kernel/avx2/u16/reduce_u16.cpp
-               source/kernel/avx2/u32/reduce_u32.cpp
+               source/kernel/avx2/echelon_u16.cpp
+               source/kernel/avx2/echelon_u32.cpp
+               source/kernel/avx2/find.cpp
+               source/kernel/avx2/misc_u16.cpp
+               source/kernel/avx2/misc_u32.cpp
+               source/kernel/avx2/modular_u16.cpp
+               source/kernel/avx2/modular_u32.cpp
+               source/kernel/avx2/reduce_u16.cpp
+               source/kernel/avx2/reduce_u32.cpp
                source/kernel/avx2/saxpy.cpp
+               source/kernel/avx512/echelon_u16.cpp
+               source/kernel/avx512/echelon_u32.cpp
+               source/kernel/avx512/find.cpp
+               source/kernel/avx512/misc_u16.cpp
+               source/kernel/avx512/misc_u32.cpp
+               source/kernel/avx512/modular_u16.cpp
+               source/kernel/avx512/modular_u32.cpp
+               source/kernel/avx512/reduce_u16.cpp
+               source/kernel/avx512/reduce_u32.cpp
+               source/kernel/generic/echelon_u16.cpp
+               source/kernel/generic/echelon_u32.cpp
+               source/kernel/generic/find.cpp
+               source/kernel/generic/misc_u16.cpp
+               source/kernel/generic/misc_u32.cpp
+               source/kernel/generic/modular_u16.cpp
+               source/kernel/generic/modular_u32.cpp
+               source/kernel/generic/reduce_u16.cpp
+               source/kernel/generic/reduce_u32.cpp
+               source/kernel/generic/saxpy.cpp
+               source/kernel/neon/echelon_u16.cpp
+               source/kernel/neon/echelon_u32.cpp
+               source/kernel/neon/find.cpp
+               source/kernel/neon/misc_u16.cpp
+               source/kernel/neon/misc_u32.cpp
+               source/kernel/neon/modular_u16.cpp
+               source/kernel/neon/modular_u32.cpp
+               source/kernel/neon/reduce_u16.cpp
+               source/kernel/neon/reduce_u32.cpp
+               source/learn.cpp
                source/linalg.cpp
                source/linalg_v3.cpp
                source/linalg_pack.cpp
@@ -96,6 +125,7 @@ set(GamBa_SRCS source/basis.cpp
                source/matrix.cpp
                source/memalign.cpp
                source/modular.cpp
+               source/order.cpp
                source/params.cpp
                source/profile.cpp
                source/reduce.cpp
@@ -120,7 +150,7 @@ set_target_properties(GamBa_exe PROPERTIES OUTPUT_NAME gamba)
 
 target_link_libraries(GamBa_exe PUBLIC git_version)
 target_link_libraries(GamBa_exe PRIVATE cpuinfo CLI11::CLI11 fmt::fmt)
-target_link_libraries(GamBa_exe PRIVATE libgmp.a libgmpxx.a libmpfr.a libflint.a)
+target_link_libraries(GamBa_exe PRIVATE libgmp.a libmpfr.a libflint.a)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   target_link_libraries(GamBa_exe PRIVATE libc++.a libc++abi.a)
@@ -149,10 +179,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "ReleaseDeb
   set_source_files_properties(${GamBa_SRCS} PROPERTIES UNITY_GROUP "gamba")
 endif()
 
-# ---- Mandatory flags ----
-
-target_compile_options(GamBa_exe PRIVATE -march=core-avx2 -mno-vzeroupper)
-
 # ---- Precompiled headers ----
 
 target_precompile_headers(GamBa_exe PRIVATE
@@ -172,9 +198,12 @@ target_precompile_headers(GamBa_exe PRIVATE
                           <cstring>
                           <ctime>
                           <fcntl.h>
+# Include GMP before FLINT
+                          <gmp.h>
                           <flint/flint.h>
                           <flint/fmpz.h>
                           <flint/fmpq.h>
+                          <flint/ulong_extras.h>
                           <fmt/base.h>
                           <fmt/format.h>
                           <fmt/ranges.h>
@@ -189,23 +218,24 @@ target_precompile_headers(GamBa_exe PRIVATE
                           <fmt/xchar.h>
                           <format>
                           <fstream>
-                          <gmpxx.h>
-                          <immintrin.h>
                           <iomanip>
                           <iostream>
                           <limits>
                           <memory>
                           <new>
+                          <numbers>
                           <numeric>
                           <random>
                           <ranges>
                           <string>
+                          <stdexcept>
                           <sys/mman.h>
                           <sys/resource.h>
                           <sys/stat.h>
                           <sys/types.h>
+                          "source/thirdparty/getRSS.hpp"
+                          "source/thirdparty/flintxx.hpp"
                           <type_traits>
                           <unistd.h>
                           <utility>
-                          <vector>
-                          <xmmintrin.h>)
+                          <vector>)

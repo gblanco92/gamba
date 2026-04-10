@@ -17,6 +17,7 @@
 #include "base_basis.hpp"
 
 #include "logger.hpp"
+#include "order.hpp"
 
 namespace gamba
 {
@@ -57,24 +58,66 @@ void base_polynomial_basis::clear()
     m_nondel_gens.shrink_to_fit();
 }
 
-void base_polynomial_basis::remove_redundant_gens()
+void base_polynomial_basis::clear_redundant()
+{
+    m_num_gens = m_num_nondel_gens;
+
+    size_t num_removed = 0;
+
+    for (size_t i = 0; i < m_redundant.size(); ++i)
+    {
+        /* clear only non-redundant generators */
+        if (not m_redundant[i])
+            continue;
+
+        auto const idx = static_cast<ssize_t>(i - num_removed);
+
+        m_mons.erase(std::begin(m_mons) + idx);
+        m_degs.erase(std::begin(m_degs) + idx);
+
+        num_removed++;
+    }
+
+    /* free memory for deleted redundant generators */
+    m_mons.shrink_to_fit();
+    m_degs.shrink_to_fit();
+
+    m_redundant.clear();
+    m_redundant.resize(m_num_gens, false);
+    m_reduced_gens.resize(m_num_gens);
+    std::iota(std::begin(m_reduced_gens), std::end(m_reduced_gens), 0UL);
+
+    /* data not needed after F4 is done with the basis */
+    m_lead_sdm.clear();
+    m_lead_sdm.shrink_to_fit();
+
+    m_spair_count.clear();
+    m_spair_count.shrink_to_fit();
+
+    m_nondel_gens.clear();
+    m_nondel_gens.shrink_to_fit();
+}
+
+void base_polynomial_basis::remove_redundant_gens(
+    [[maybe_unused]] monomial_order const& mon_order)
 {
     /* when inserting elements into the basis in decreasing order of leading
      * monomial the Gebauer-Moeller installation ensures that the leading
      * monomials of the final basis are already reduced; if a different order is
-     * chosen generators the non-reduced lead mons. must be removed manually */
+     * chosen, generators of non-reduced lead mons. must be removed manually */
 #if INSERT_ELEMENTS_DECREASING == 0
-    constexpr bool const remove_redundant = true;
-    /* if the non-redundant heuristic for non-degree orderings is enable AND the
-     * order is non-degree we must remove potencial redudant generators */
+    bool const remove_redundant = true;
+
+    /* if the non-redundant heuristic for non-degree orderings is enabled AND
+     * the order is non-degree we must remove potencial redudant generators */
 #elif NONDEG_ORDERS_HEURISTIC == 1
-    constexpr bool const remove_redundant =
-        not is_degree_order_v<MonomialOrder>;
+    bool const remove_redundant = not mon_order.is_degree_order();
+
 #else
-    constexpr bool const remove_redundant = false;
+    bool const remove_redundant = false;
 #endif
 
-    if constexpr (not remove_redundant)
+    if (not remove_redundant)
         return;
 
     size_t num_redundant = 0;
@@ -128,9 +171,15 @@ void base_polynomial_basis::update_deleted_gens()
 
     for (size_t i = 0; i < m_num_gens; ++i)
     {
+        bool const is_del = is_deleted(i);
+
         m_nondel_gens[i] =
-            (is_deleted(i) ? infty
-                           : static_cast<index_type>(m_num_nondel_gens++));
+            (is_del ? infty : static_cast<index_type>(m_num_nondel_gens++));
+
+#if !USE_DELETED_REDUCERS
+        if (is_del)
+            v_free_generator(i);
+#endif
     }
 }
 

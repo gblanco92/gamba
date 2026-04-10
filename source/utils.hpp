@@ -24,29 +24,29 @@
 #include "logger.hpp"
 
 #ifdef DEBUG_GAMBA
-#    define GAMBA_DEBUG(code) code
+#define GAMBA_DEBUG(code) code
 #else
-#    define GAMBA_DEBUG(code)
+#define GAMBA_DEBUG(code)
 #endif
 
 #ifdef RELEASE_GAMBA
-#    define GAMBA_RELEASE(code) code
-#    define GAMBA_DEVELOP(code)
+#define GAMBA_RELEASE(code) code
+#define GAMBA_DEVELOP(code)
 #else
-#    define GAMBA_DEVELOP(code) code
-#    define GAMBA_RELEASE(code)
+#define GAMBA_DEVELOP(code) code
+#define GAMBA_RELEASE(code)
 #endif
 
 #ifdef PROFILE_GAMBA
-#    define GAMBA_PROFILE(code) code
+#define GAMBA_PROFILE(code) code
 #else
-#    define GAMBA_PROFILE(code)
+#define GAMBA_PROFILE(code)
 #endif
 
 #ifdef DEBUG_GAMBA
-#    define FORCE_INLINE inline
+#define FORCE_INLINE inline
 #else
-#    define FORCE_INLINE inline __attribute__((__always_inline__))
+#define FORCE_INLINE inline __attribute__((__always_inline__))
 #endif
 
 #define LIKELY(x)   __builtin_expect_with_probability((x), 1, 1.0)
@@ -56,9 +56,9 @@
 #define STRINGIFY(X)        STRINGIFY_HELPER(X)
 
 #ifdef __clang__
-#    define PRAGMA_UNROLL_LOOP(x) _Pragma(STRINGIFY(clang loop unroll_count(x)))
+#define PRAGMA_UNROLL_LOOP(x) _Pragma(STRINGIFY(clang loop unroll_count(x)))
 #else
-#    define PRAGMA_UNROLL_LOOP(x) _Pragma(STRINGIFY(GCC unroll(x)))
+#define PRAGMA_UNROLL_LOOP(x) _Pragma(STRINGIFY(GCC unroll(x)))
 #endif
 
 namespace gamba
@@ -196,7 +196,7 @@ struct buffer_row_wrapper
 };
 
 /* swap two (strided) rows of a linear algebra buffer in place */
-template <size_t NUM_ROWS_BUFFER, class ValueType>
+template <size_t NROWS_BUFFER, class ValueType>
 void swap_buffer_rows(ValueType* lhs_buffer,
                       size_t const lhs_idx,
                       ValueType* rhs_buffer,
@@ -207,32 +207,32 @@ void swap_buffer_rows(ValueType* lhs_buffer,
 
     for (; i < (buffer_size & ~0x3U); i += 4)
     {
-        std::swap(lhs_buffer[lhs_idx + 0 * NUM_ROWS_BUFFER],
-                  rhs_buffer[rhs_idx + 0 * NUM_ROWS_BUFFER]);
+        std::swap(lhs_buffer[lhs_idx + 0 * NROWS_BUFFER],
+                  rhs_buffer[rhs_idx + 0 * NROWS_BUFFER]);
 
-        std::swap(lhs_buffer[lhs_idx + 1 * NUM_ROWS_BUFFER],
-                  rhs_buffer[rhs_idx + 1 * NUM_ROWS_BUFFER]);
+        std::swap(lhs_buffer[lhs_idx + 1 * NROWS_BUFFER],
+                  rhs_buffer[rhs_idx + 1 * NROWS_BUFFER]);
 
-        std::swap(lhs_buffer[lhs_idx + 2 * NUM_ROWS_BUFFER],
-                  rhs_buffer[rhs_idx + 2 * NUM_ROWS_BUFFER]);
+        std::swap(lhs_buffer[lhs_idx + 2 * NROWS_BUFFER],
+                  rhs_buffer[rhs_idx + 2 * NROWS_BUFFER]);
 
-        std::swap(lhs_buffer[lhs_idx + 3 * NUM_ROWS_BUFFER],
-                  rhs_buffer[rhs_idx + 3 * NUM_ROWS_BUFFER]);
+        std::swap(lhs_buffer[lhs_idx + 3 * NROWS_BUFFER],
+                  rhs_buffer[rhs_idx + 3 * NROWS_BUFFER]);
 
-        lhs_buffer += 4 * NUM_ROWS_BUFFER;
-        rhs_buffer += 4 * NUM_ROWS_BUFFER;
+        lhs_buffer += 4 * NROWS_BUFFER;
+        rhs_buffer += 4 * NROWS_BUFFER;
     }
 
     for (; i < buffer_size; ++i)
     {
         std::swap(lhs_buffer[lhs_idx], rhs_buffer[rhs_idx]);
 
-        lhs_buffer += NUM_ROWS_BUFFER;
-        rhs_buffer += NUM_ROWS_BUFFER;
+        lhs_buffer += NROWS_BUFFER;
+        rhs_buffer += NROWS_BUFFER;
     }
 }
 
-template <size_t NUM_ROWS_BUFFER,
+template <size_t NROWS_BUFFER,
           class ValueType,
           class IndexType,
           size_t StrideOffset>
@@ -240,7 +240,7 @@ void swap(buffer_row_wrapper<ValueType, IndexType, StrideOffset>& lhs,
           buffer_row_wrapper<ValueType, IndexType, StrideOffset>& rhs,
           size_t const size) noexcept
 {
-    swap_buffer_rows<NUM_ROWS_BUFFER>(lhs.m_ptr, 0, rhs.m_ptr, 0, size);
+    swap_buffer_rows<NROWS_BUFFER>(lhs.m_ptr, 0, rhs.m_ptr, 0, size);
 
     std::iter_swap(lhs.m_idx, rhs.m_idx);
 }
@@ -265,15 +265,13 @@ std::string libgmp_version_string();
 
 std::string libflint_version_string();
 
-void print_memory_usage(double const mem_usage);
+void print_memory_usage(double const mem_usage, log::level const lvl);
 
-void print_memory_usage();
-
-void print_time(std::chrono::duration<double> const time,
-                bool const new_line = false);
+void print_memory_usage(log::level const lvl);
 
 #if defined(DEBUG_GAMBA) \
     && (defined(__linux__) || defined(__linux) || defined(linux))
+
 /* checks whether transparent huge pages have been allocated */
 static inline void check_smaps_file()
 {

@@ -13,6 +13,8 @@ source/git_version.cpp
 CMakeLists.txt.user
 CMakeUserPresets.json
 
+source/learn.hpp
+source/learn.cpp
 source/linalg.hpp
 source/linalg.cpp
 source/linalg_v3.hpp

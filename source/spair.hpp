@@ -18,11 +18,14 @@
 
 #include <type_traits>
 
+#include <flint/flint.h>
+
 #include "base_basis.hpp"
 #include "container.hpp"
 #include "divmask.hpp"
+#include "learn.hpp"
 #include "monomial.hpp"
-#include "stats.hpp"
+#include "order.hpp"
 
 namespace gamba
 {
@@ -110,87 +113,25 @@ struct spair_update_order
     }
 };
 
-template <class MonomialOrder>
 struct spair_select_order
 {
-    using monomial_order = MonomialOrder;
-
     /* comparators return a signed type so negation for reverse sorting works */
-    int32_t operator()(spair_type const& lhs, spair_type const& rhs) const
+    int32_t operator()(monomial_order const& mon_order,
+                       spair_type const& lhs,
+                       spair_type const& rhs) const
     {
         if (lhs.deg != rhs.deg)
             return lhs.deg - rhs.deg;
 
         /* in case of ties use the monomial order */
-        return monomial_order{}(lhs.lcm, rhs.lcm);
+        return mon_order.cmp(lhs.lcm, rhs.lcm);
     }
 };
 
-template <class MonomialOrder>
-[[nodiscard]] std::pair<size_t, size_t> select_spairs(spair_set& spairs)
-{
-    using monomial_order     = MonomialOrder;
-    using degree_type        = spair_type::degree_type;
-    using signed_degree_type = spair_type::signed_degree_type;
-
-    /* timings */
-    auto const start_cputime  = std::clock();
-    auto const start_walltime = std::chrono::system_clock::now();
-
-    if (params::all_spairs)
-    {
-        /* if using all spairs just sort by the given monomial order of lcms */
-        std::sort(std::begin(spairs.queue), std::end(spairs.queue),
-                  [](spair_type const& lhs, spair_type const& rhs) {
-                      return monomial_order{}(lhs.lcm, rhs.lcm) < 0;
-                  });
-
-        /* timings */
-        auto const end_cputime  = std::clock();
-        auto const end_walltime = std::chrono::system_clock::now();
-
-        stats::select_walltime +=
-            std::chrono::duration<double>(end_walltime - start_walltime)
-                .count();
-        stats::select_cputime +=
-            static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
-
-        stats::spairs_reduced += static_cast<ssize_t>(spairs.queue.size());
-
-        return std::make_pair(spairs.queue.size(),
-                              std::numeric_limits<size_t>::max());
-    }
-
-    /* sort first by degree and within same degrees use the monomial order */
-    std::sort(std::begin(spairs.queue), std::end(spairs.queue),
-              [](spair_type const& lhs, spair_type const& rhs) {
-                  return spair_select_order<monomial_order>{}(lhs, rhs) < 0;
-              });
-
-    signed_degree_type const min_deg{spairs.queue[0].deg};
-
-    auto const mindeg_end = std::ranges::upper_bound(
-        spairs.queue, min_deg, {}, [](spair_type const& sp) { return sp.deg; });
-
-    ssize_t const num_selec_pairs =
-        std::min(params::max_spairs, mindeg_end - std::cbegin(spairs.queue));
-
-    log::print(log::INFO2, "│ {:3}{:>8} / {:<5}", min_deg, num_selec_pairs,
-               spairs.queue.size());
-    ::fflush(stdout);
-
-    /* timings */
-    auto const end_cputime  = std::clock();
-    auto const end_walltime = std::chrono::system_clock::now();
-
-    stats::select_walltime +=
-        std::chrono::duration<double>(end_walltime - start_walltime).count();
-    stats::select_cputime +=
-        static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
-
-    stats::spairs_reduced += num_selec_pairs;
-
-    return std::make_pair(num_selec_pairs, static_cast<degree_type>(min_deg));
-}
+[[nodiscard]] std::pair<size_t, size_t> select_spairs(
+    spair_set& spairs,
+    monomial_order const& mon_order,
+    learn_f4_data const* learn_data,
+    size_t const round);
 
 }  // namespace gamba

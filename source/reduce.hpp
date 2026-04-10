@@ -23,11 +23,12 @@
 namespace gamba
 {
 
-template <class MonomialOrder, class CoefficientType>
-void reduce(polynomial_basis<CoefficientType>& basis, matrix_f4& matrix)
+template <class CoefficientType>
+void reduce(polynomial_basis<CoefficientType>& basis,
+            monomial_order const& mon_order,
+            matrix_f4& matrix)
 {
-    using coeff_type     = CoefficientType;
-    using monomial_order = MonomialOrder;
+    using coeff_type = CoefficientType;
 
     /* timings */
     auto const start_cputime  = std::clock();
@@ -41,13 +42,13 @@ void reduce(polynomial_basis<CoefficientType>& basis, matrix_f4& matrix)
     /* do not count the reduced rows from the reduction phase */
     stats::rows_reduced -= matrix.num_bottom_rows();
 
-    matrix.convert_monomials_to_columns(monomial_order{});
+    matrix.convert_monomials_to_columns(mon_order);
 
     linalg<coeff_type> interreduce_engine{basis.field, matrix};
     interreduce_engine.interreduce(matrix);
 
     basis.clear();
-    basis.insert_new_rows_reduce(matrix, monomial_order{});
+    basis.insert_new_rows_reduce(matrix, mon_order);
 
     /* timings */
     auto const end_cputime  = std::clock();
@@ -58,10 +59,11 @@ void reduce(polynomial_basis<CoefficientType>& basis, matrix_f4& matrix)
     stats::reduce_cputime +=
         static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
 
-    print_memory_usage();
+    print_memory_usage(log::INFO2);
 
-    print_time(end_walltime - start_walltime, /* new_line = */ true);
+    std::chrono::duration<double> const time = end_walltime - start_walltime;
 
+    log::print(log::INFO2, "{:10.2f} sec │\n", time.count());
     log::print(log::INFO2, "└{0:─^{1}}┘\n", "", 118);
 }
 

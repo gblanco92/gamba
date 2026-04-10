@@ -53,7 +53,7 @@
       ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_FLAGS_DEBUG": "-O0 -g -ggdb3 -DDEBUG -DDEBUG_GAMBA -DDEBUG_STDLIB=1"
+        "CMAKE_CXX_FLAGS_DEBUG": "-O1 -g -ggdb3 -DDEBUG -DDEBUG_GAMBA -DDEBUG_STDLIB=1"
       }
     },
     {
@@ -69,10 +69,22 @@
       }
     },
     {
+      "name": "sanitize-thread",
+      "binaryDir": "${sourceDir}/build/sanitize-thread",
+      "inherits": [
+        "unix",
+        "dev-mode"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS_DEBUG": "-O2 -g -fsanitize=thread -fno-omit-frame-pointer -fno-common -DDEBUG -DDEBUG_GAMBA -DDEBUG_STDLIB=0 -DSANITIZE_GAMBA"
+      }
+    },
+    {
       "name": "optimize",
       "binaryDir": "${sourceDir}/build/optimize",
       "inherits": [
-        "unix", 
+        "unix",
         "dev-mode"
       ],
       "cacheVariables": {

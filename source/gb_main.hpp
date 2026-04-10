@@ -25,27 +25,26 @@
 namespace gamba
 {
 
-template <class CoefficientType, class MonomialOrder>
-generators_data groebner_basis_main(generators_data const& input_data)
+template <class CoefficientType>
+generators_data groebner_basis_main(generators_data const& input_data,
+                                    monomial_order const& mon_order)
 {
-    using monomial_order = MonomialOrder;
-    using coeff_type     = CoefficientType;
-    using basis_type     = polynomial_basis<coeff_type>;
+    using coeff_type = CoefficientType;
+    using basis_type = polynomial_basis<coeff_type>;
 
     /* set monomial_base static data */
-    monomial_base::exp_size =
-        monomial_order::exponent_size(input_data.num_vars);
+    monomial_base::exp_size = mon_order.exponent_size(input_data.num_vars);
 
-    if constexpr (is_block_order_v<monomial_order>)
+    if (mon_order.is_block_order())
         monomial_base::block_size = params::num_elim_vars + 1;
 
     monomial_base::initialize_weights();
 
     /* initialize basis from input generators */
     basis_type basis{input_data.num_vars, input_data.field_char};
-    basis.import_generators(input_data, monomial_order{});
+    basis.import_generators(input_data, mon_order);
 
-    GAMBA_DEBUG(basis.print_generators(monomial_order{});)
+    GAMBA_DEBUG(basis.print_generators());
 
     basis.print_info();
 
@@ -54,15 +53,15 @@ generators_data groebner_basis_main(generators_data const& input_data)
     auto const start_walltime = std::chrono::system_clock::now();
 
     constexpr bool const rational_coeffs =
-        std::is_same_v<coeff_type, mpq_class>;
+        std::is_same_v<coeff_type, fmpq_class>;
 
     if constexpr (rational_coeffs)
     {
-        f4_modular<monomial_order>(basis);
+        f4_modular(basis, mon_order);
     }
     else
     {
-        f4_main<monomial_order>(basis);
+        f4_main(basis, mon_order, nullptr);
     }
 
     /* timings */
@@ -78,7 +77,7 @@ generators_data groebner_basis_main(generators_data const& input_data)
     stats::print_statistics();
 
     generators_data output_data;
-    basis.export_generators(output_data);
+    basis.export_generators(output_data, params::lead_mons);
 
     /* copy variable names from input data */
     output_data.var_names = input_data.var_names;

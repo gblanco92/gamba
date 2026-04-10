@@ -14,7 +14,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
-#include <fstream>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -29,7 +29,7 @@
 #include "utils.hpp"
 
 #ifdef PROFILE_GAMBA
-#    include "profile.hpp"
+#include "profile.hpp"
 #endif
 
 namespace
@@ -47,22 +47,36 @@ void add_command_line_options(CLI::App& app,
 
     app.add_option("-o,--output-file", output_file, "Output filename");
 
-    app.add_option("-e,--num-elim", gamba::params::num_elim_vars,
-                   R"(Number of variables in the first elimination block
-Must be an integer in the range [0, #variables))");
+    app.add_option(
+           "-d,--order", gamba::params::mon_order_str,
+           R"(Monomial order: grevlex, deglex, lexic, blockelim, grevlexw)")
+        ->capture_default_str();
+
+    app.add_option(
+        "-e,--num-elim", gamba::params::num_elim_vars,
+        R"(Number of variables in the first elimination block for 'blockelim'. 
+        Must be an integer in the range [0, #variables))");
+
+    app.add_option("-w,--weights", gamba::params::weights,
+                   R"(Monomial weights for the 'grevlexw' monomial order)")
+        ->delimiter(',');
 
     app.add_option(
            "--max-spairs", gamba::params::max_spairs,
-           R"(Max. number of pairs with min. degree selected in each round
+           R"(Max. number of pairs with min. degree selected in each round.
 Set max-spairs = 0 to select all pairs with minimal degree)")
         ->check(CLI::Range(0U, std::numeric_limits<uint32_t>::max())
                     .description(""));
 
     app.add_flag("--all-spairs", gamba::params::all_spairs,
-                 "Select all pairs in the queue in each round");
+                 R"(Select all pairs in the queue in each round)");
 
     app.add_flag("--no-reduce", gamba::params::no_reduce,
-                 "Do not compute a reduced Groebner basis")
+                 R"(Do not compute a reduced Groebner basis)")
+        ->capture_default_str();
+
+    app.add_flag("--lead-mons", gamba::params::lead_mons,
+                 R"(Return only the leading monomials of a Groebner basis)")
         ->capture_default_str();
 
     app.add_option("-s,--seed", gamba::params::seed,
@@ -84,15 +98,18 @@ Set max-spairs = 0 to select all pairs with minimal degree)")
         ->capture_default_str();
 }
 
-void print_system_info()
+void print_system_info(std::string const& simd)
 {
     using namespace gamba;  // NOLINT
 
     auto const* const processor = cpuinfo_get_processor(0);
 
-    log::print(log::INFO0, "{}{}", colored<CYAN_BOLD>("GamBa v"),
-               colored<CYAN_BOLD>(GAMBA_VERSION));
+    log::print(log::INFO0, "{}{}.{}.{}", colored<CYAN_BOLD>("GamBa v"),
+               colored<CYAN_BOLD>(GAMBA_VERSION_MAJOR),
+               colored<CYAN_BOLD>(GAMBA_VERSION_MINOR),
+               colored<CYAN_BOLD>(GAMBA_VERSION_PATCH));
     log::print(log::INFO0, " running on {}", processor->package->name);
+    log::print(log::INFO0, " ({})", simd);
     log::print(log::INFO0, " [seed = {}]\n", gamba::params::seed);
 
     GAMBA_DEVELOP(log::print(log::INFO0, "Git commit: {}\n", git_hash));
@@ -118,22 +135,42 @@ int main(int argc, char** argv)
     {
         /* initialize subsystems */
         cpuinfo_initialize();
+
         GAMBA_PROFILE(gamba::profiler::init());
 
-        /* print banner */
-        print_system_info();
-
-        /* check for AVX2 instrunction set at runtime */
+#if defined(__AVX2__) && !defined(__AVX512F__)
+        std::string const simd = "AVX2";
+        /* check for AVX2 instruction set at runtime */
         if (not cpuinfo_has_x86_avx2())
             throw std::runtime_error("CPU does not support AVX2 instructions.");
+
+#elif defined(__AVX512F__)
+        std::string const simd = "AVX512";
+        /* check for AVX512 instruction set at runtime */
+        if (not cpuinfo_has_x86_avx512f())
+            throw std::runtime_error(
+                "CPU does not support AVX512 instructions.");
+
+#elif defined(__ARM_NEON__)
+        std::string const simd = "Neon";
+        /* check for NEON instruction set at runtime */
+        if (not cpuinfo_has_arm_neon())
+            throw std::runtime_error("CPU does not support NEON instructions.");
+
+#else
+        std::string const simd = "Generic";
+#endif
+
+        /* print banner */
+        print_system_info(simd);
 
         /* set priority of the process */
         setpriority(PRIO_PROCESS, 0, GAMBA_PRIORITY);
 
         /* read input file */
-        std::ifstream infile{input_file};
+        std::FILE* infile = std::fopen(input_file.c_str(), "r");
 
-        if (infile.fail())
+        if (infile == nullptr)
             throw std::runtime_error("Error opening input file.");
 
         gamba::generators_data input_data;
@@ -151,9 +188,9 @@ int main(int argc, char** argv)
         /* write output file if available */
         if (not output_file.empty())
         {
-            std::ofstream outfile{output_file};
+            std::FILE* outfile = std::fopen(output_file.c_str(), "w");
 
-            if (outfile.fail())
+            if (outfile == nullptr)
                 throw std::runtime_error("Error opening output file.");
 
             output_data.write(outfile);
@@ -161,17 +198,18 @@ int main(int argc, char** argv)
     }
     catch (std::exception const& excep)
     {
-        gamba::log::print(gamba::log::ERROR, "\n{}\n", excep.what());
+        gamba::log::print(gamba::log::ERROR, "{}\n", excep.what());
         ret_val = -1;
     }
     catch (...)
     {
-        gamba::log::print(gamba::log::ERROR, "\nUnexpected error.\n");
+        gamba::log::print(gamba::log::ERROR, "Unexpected error.\n");
         ret_val = -2;
     }
 
     /* clean-up subsystems */
     cpuinfo_deinitialize();
+
     GAMBA_PROFILE(gamba::profiler::destroy());
 
     return ret_val;

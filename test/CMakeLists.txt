@@ -594,68 +594,147 @@ add_test(NAME GamBa_test_one_ideal_0
 
 # Lexicographical order
 
-#add_test(NAME GamBa_test_cyclic4_15_lex
-#  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 "lexic"
-#  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
-#
-#add_test(NAME GamBa_test_cyclic5_15_lex
-#  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 "lexic"
-#  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
-#
-#add_test(NAME GamBa_test_cyclic6_15_lex
-#  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic6-15 "lexic"
-#  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
-#
-#add_test(NAME GamBa_test_kat6_15_lex
-#  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat6-15 "lexic"
-#  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
-#
-#add_test(NAME GamBa_test_kat7_15_lex
-#  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat7-15 "lexic"
-#  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+add_test(NAME GamBa_test_cyclic4_15_lex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 lexic
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_cyclic5_15_lex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 lexic
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat6_15_lex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat6-15 lexic
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat7_15_lex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat7-15 lexic
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+# Degree lexicographical order
+
+add_test(NAME GamBa_test_cyclic4_15_deglex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 deglex
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_cyclic5_15_deglex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 deglex
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat6_15_deglex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat6-15 deglex
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat7_15_deglex
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat7-15 deglex
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 # Block elim. order
 
-add_test(NAME GamBa_test_cyclic4_15_elim0
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 0
-  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
-
 add_test(NAME GamBa_test_cyclic4_15_elim1
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 1
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 blockelim 1
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_cyclic4_15_elim2
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 2
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 blockelim 2
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_cyclic4_15_elim3
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 3
-  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
-
-add_test(NAME GamBa_test_cyclic5_15_elim0
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 blockelim 3
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_cyclic5_15_elim1
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 1
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 blockelim 1
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_cyclic5_15_elim2
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 2
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 blockelim 2
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_cyclic5_15_elim3
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 3
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 blockelim 3
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_cyclic5_15_elim4
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 4
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 blockelim 4
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_branch_2_3_15_elim1
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} branch_2_3-15 1
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} branch_2_3-15 blockelim 1
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
 
 add_test(NAME GamBa_test_branch_4_6_7_15_elim1
-  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} branch_4_6_7-15 1
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} branch_4_6_7-15 blockelim 1
   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+# Char = 0
+
+add_test(NAME GamBa_test_cyclic4_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_cyclic5_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_cyclic6_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic6-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat6_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat6-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat7_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat7-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat8_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat8-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_eco10_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} eco10-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_noon3_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} noon3-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_noon4_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} noon5-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_noon5_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} noon5-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_noon6_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} noon6-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_reimer5_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} reimer5-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_reimer6_0
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} reimer6-0
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+# Degree reverse weighted lexicographical order
+
+add_test(NAME GamBa_test_cyclic4_15_grevlexw1,2,3,4
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic4-15 grevlexw 1,2,3,4
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_cyclic5_15_grevlewx4,3,2,1,1
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} cyclic5-15 grevlexw 4,3,2,1,1
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat6_15_grevlexw1,1,2,2,3,3
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat6-15 grevlexw 1,1,2,2,3,3
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+
+add_test(NAME GamBa_test_kat7_15_lex1,1,2,2,3,3,4
+  COMMAND ${CMAKE_CURRENT_LIST_DIR}/test_output.sh ${CMAKE_BINARY_DIR} kat7-15 grevlexw 1,1,2,2,3,3,4
+  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}")
+

@@ -28,32 +28,15 @@ extern template class linalg<uint8_t>;
 extern template class linalg<uint16_t>;
 extern template class linalg<uint32_t>;
 
-template void reduce<order_grevlex, uint8_t>(polynomial_basis<uint8_t>& basis,
-                                             matrix_f4& matrix);
-template void reduce<order_grevlex, uint16_t>(polynomial_basis<uint16_t>& basis,
-                                              matrix_f4& matrix);
-template void reduce<order_grevlex, uint32_t>(polynomial_basis<uint32_t>& basis,
-                                              matrix_f4& matrix);
-
-// template void reduce<order_lexic, uint8_t>(
-//      polynomial_basis<uint8_t>& basis,
-//      matrix_f4& matrix);
-// template void reduce<order_lexic, uint16_t>(
-//      polynomial_basis<uint16_t>& basis,
-//      matrix_f4& matrix);
-// template void reduce<order_lexic, uint32_t>(
-//      polynomial_basis<uint32_t>& basis,
-//      matrix_f4& matrix);
-
-template void reduce<order_blockelim, uint8_t>(  // NOFORMAT
-    polynomial_basis<uint8_t>& basis,
-    matrix_f4& matrix);
-template void reduce<order_blockelim, uint16_t>(
-    polynomial_basis<uint16_t>& basis,
-    matrix_f4& matrix);
-template void reduce<order_blockelim, uint32_t>(
-    polynomial_basis<uint32_t>& basis,
-    matrix_f4& matrix);
+template void reduce<uint8_t>(polynomial_basis<uint8_t>& basis,
+                              monomial_order const& mon_order,
+                              matrix_f4& matrix);
+template void reduce<uint16_t>(polynomial_basis<uint16_t>& basis,
+                               monomial_order const& mon_order,
+                               matrix_f4& matrix);
+template void reduce<uint32_t>(polynomial_basis<uint32_t>& basis,
+                               monomial_order const& mon_order,
+                               matrix_f4& matrix);
 #endif
 
 }  // namespace gamba

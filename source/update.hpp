@@ -274,9 +274,9 @@ void update_spairs(spair_set& spairs,
 }  // namespace update
 
 template <class MonomialOrder>
-void update_f4(spair_set& spairs,
-               base_polynomial_basis& basis,
-               size_t const prev_num_gens)
+void update_f4_impl(spair_set& spairs,
+                    base_polynomial_basis& basis,
+                    size_t const prev_num_gens)
 {
     using monomial_order = MonomialOrder;
 
@@ -311,5 +311,10 @@ void update_f4(spair_set& spairs,
     stats::update_cputime +=
         static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
 }
+
+void update_f4(spair_set& spairs,
+               base_polynomial_basis& basis,
+               monomial_order const& mon_order,
+               size_t const prev_num_gens);
 
 }  // namespace gamba

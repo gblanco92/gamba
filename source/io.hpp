@@ -19,10 +19,8 @@
 #include <ranges>
 #include <string>
 
-#include <gmpxx.h>
-
 #include "monomial.hpp"
-#include "order.hpp"
+#include "thirdparty/flintxx.hpp"
 
 namespace gamba
 {
@@ -30,39 +28,39 @@ namespace gamba
 struct generators_data
 {
     using var_type     = uint32_t;
-    using coeff_type   = mpq_class;
+    using coeff_type   = fmpq_class;
     using coeff_p_type = uint32_t;
     using exp_type     = int32_t;
 
     /* type used by the engine to represent exponent */
     using exponent_type = monomial_base::exponent_type;
 
-    void read(std::istream& infile);
+    void read(std::FILE* infile);
 
 private:
-    void read_num_vars(std::istream& infile);
+    void read_num_vars(std::FILE* infile);
 
-    void read_characteristic(std::istream& infile);
+    void read_characteristic(std::FILE* infile);
 
-    void read_num_generators(std::istream& infile);
+    void read_num_generators(std::FILE* infile);
 
-    void read_variable_names(std::istream& infile);
+    void read_variable_names(std::FILE* infile);
 
-    void read_generators(std::istream& infile);
+    void read_generators(std::FILE* infile);
 
     void read_generator_line(std::string line, size_t const line_num);
 
     void read_exponent(std::string term);
 
 public:
-    void write(std::ostream& outfile) const;
+    void write(std::FILE* outfile) const;
 
 private:
     template <class CoefficientType>
-    void write_generators(std::ostream& outfile,
+    void write_generators(std::FILE* outfile,
                           std::vector<CoefficientType> const& coeff) const;
     template <bool Star>
-    bool write_monomial(std::ostream& outfile, size_t offset) const;
+    bool write_monomial(std::FILE* outfile, size_t offset) const;
 
 public:
     var_type num_vars{};
@@ -77,16 +75,18 @@ public:
     std::vector<coeff_p_type> coeffs_modp{};
     std::vector<exp_type> exps{};
     std::vector<size_t> lens{};
+
+private:
+    char* m_line_ptr{nullptr};
+    size_t m_size{0ULL};
 };
 
-template <class MonomialType, class MonomialOrder>
+template <class MonomialType>
 std::string monomial2string(MonomialType const& mon)
 {
-    using monomial_type  = MonomialType;
-    using monomial_order = MonomialOrder;
+    using monomial_type = MonomialType;
 
-    constexpr size_t const offset =
-        std::is_same_v<monomial_order, order_blockelim> ? 2 : 1;
+    size_t const offset = monomial_type::block_size > 0 ? 2 : 1;
 
     static auto const names =
         std::views::iota(0ULL, mon.size() - offset)

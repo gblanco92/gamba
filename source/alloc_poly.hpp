@@ -35,8 +35,6 @@ std::pair<basis_monomial*, CoefficientType*> allocate_polynomial(
     using monomial_type = basis_monomial;
 
     constexpr size_t const std_align = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
-    /* make sure mpq_class does not have extra alignment requirements */
-    static_assert(alignof(mpq_class) <= std_align);
 
     size_t const num_bytes_mons  = num_terms * sizeof(monomial_type);
     size_t const num_bytes_coefs = num_terms * sizeof(coeff_type);

@@ -1,3 +1,11 @@
+# v0.3
+
+- Add support for AVX512 instructions.
+- Release AVX512 binary.
+- Enable monomial orders: deglex, lexic, grevlexw
+- Add support for ARM64 and NEON SIMD instructions.
+- Release MacOS binary.
+
 # v0.2
 - Significant decrease in peak memory usage.
 - Moderate speed-up in linear algebra phase for p > 2^16.

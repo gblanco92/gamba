@@ -21,6 +21,7 @@
 #include "container.hpp"
 #include "divmap.hpp"
 #include "monomial.hpp"
+#include "order.hpp"
 
 namespace gamba
 {
@@ -64,6 +65,8 @@ protected:
 
     void clear();
 
+    void clear_redundant();
+
     double memory_usage() const;
 
 public:
@@ -78,6 +81,8 @@ public:
         default;
 
     /* access member functions */
+    virtual uint32_t field_char() const = 0;
+
     size_t num_gens() const { return m_num_gens; }
 
     length_type length(size_t const i) const
@@ -129,14 +134,17 @@ public:
     count_type& spair_count(size_t const i) { return m_spair_count[i]; }
 
     /* after an update process enforce the following invariant:
-     *  redundant[reduced_lm[i]] == false */
+     * redundant[reduced_gens[i]] == false */
     template <class MonomialOrder>
     void update_reduced_gens(size_t const prev_num_gens,
                              MonomialOrder /*unused*/);
 
-    void remove_redundant_gens();
+    void remove_redundant_gens(
+        [[maybe_unused]] monomial_order const& mon_order);
 
     void update_deleted_gens();
+
+    virtual void v_free_generator(size_t const i) = 0;
 
     void print_info() const;
 
@@ -165,17 +173,17 @@ protected:
     std::shared_ptr<divmap_type> m_divmap;
 
     /* divisibility mask for each generator's leading monomial */
-    std::vector<divmask_type> m_lead_sdm{};
+    mutable std::vector<divmask_type> m_lead_sdm{};
 
     /* version of divmap used in the computation of current lead_sdm */
-    size_t m_divmasks_version{0UL};
+    mutable size_t m_divmasks_version{0UL};
 
     /* polynomials of the basis made redundant by G-M update; make it aligned so
      * it can be updated concurrently, avoid std::vector<bool> specialization */
     aligned_vector<uint8_t> m_redundant{};
 
     /* keeps the index of top reduced polynomials in the basis; this means that
-     * for all index i: redundant[reduced_lm[i]] == false for all i */
+     * for all index i: redundant[reduced_gens[i]] == false for all i */
     std::vector<index_type> m_reduced_gens{};
 
     /* number of non-deleted generators in the basis; a generators is marked as

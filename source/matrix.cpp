@@ -139,8 +139,10 @@ void matrix_f4::insert_spairs(spair_set& spairs,
                       basis.spair_count(sp.idx2)--;
                   });
 
-    /* every time spair_count are decreased new deleted gens. can be created */
-    basis.update_deleted_gens();
+    /* every time spair_count are decreased new deleted gens. can be created
+     * HOWEVER, do not updated delete gens here because we can not free memory
+     * as some deleted generators might be already inserted in the matrix */
+    // basis.update_deleted_gens();
 
     /* remove inserted spairs from spair queue */
     spairs.queue.erase(std::begin(spairs.queue), spairs_end);
@@ -153,6 +155,74 @@ void matrix_f4::insert_spairs(spair_set& spairs,
         std::chrono::duration<double>(end_walltime - start_walltime).count();
     stats::matrix_cputime +=
         static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
+}
+
+void matrix_f4::convert_monomials_to_columns(monomial_order const& mon_order)
+{
+    /* timings */
+    auto const start_cputime  = std::clock();
+    auto const start_walltime = std::chrono::system_clock::now();
+
+    /* initialize the column -> monomial mapping with all matrix monomials */
+    m_col_to_mon.resize(num_cols());
+
+    std::copy(std::cbegin(m_mon_set), std::cend(m_mon_set),
+              std::begin(m_col_to_mon));
+
+    /* sort the monomials appearing as column by *reverse* monomial order */
+    std::sort(std::begin(m_col_to_mon), std::end(m_col_to_mon),
+              [&mon_order](monomial_type const lhs, monomial_type const rhs) {
+                  return mon_order.cmp(lhs, rhs) > 0;
+              });
+
+    /* store the inverse mapping: matrix monomial -> column index */
+    std::for_each(std::cbegin(m_col_to_mon), std::cend(m_col_to_mon),
+                  [idx = 0U](monomial_type const mon) mutable {
+                      mon.data().idx = idx++;
+                  });
+
+    /* there is no need to sort the individual rows since the rows/generators
+     * are sorted by the given monomial order and the stable partition preserves
+     * this order */
+
+    /* sort top rows by pivot order */
+    std::ranges::sort(
+        std::views::zip(m_top_rows, m_top_coefs),
+        [](index_type const lhs, index_type const rhs) { return lhs < rhs; },
+        [](auto const& row_cfs) { return std::get<0>(row_cfs)[0].data().idx; });
+
+    /* sort bottom rows by (reverse) pivot order */
+    std::ranges::sort(
+        std::views::zip(m_bottom_rows, m_bottom_coefs),
+        [](index_type const lhs, index_type const rhs) { return lhs > rhs; },
+        [](auto const& row_cfs) { return std::get<0>(row_cfs)[0].data().idx; });
+
+    /* timings */
+    auto const end_cputime  = std::clock();
+    auto const end_walltime = std::chrono::system_clock::now();
+
+    stats::convert_walltime +=
+        std::chrono::duration<double>(end_walltime - start_walltime).count();
+    stats::convert_cputime +=
+        static_cast<double>(end_cputime - start_cputime) / CLOCKS_PER_SEC;
+
+    size_t const nnz_top = std::accumulate(
+        std::cbegin(m_top_rows), std::cend(m_top_rows), 0ULL,
+        [](size_t acc, auto const& row) { return acc + row.size(); });
+
+    size_t const nnz_bot = std::accumulate(
+        std::cbegin(m_bottom_rows), std::cend(m_bottom_rows), 0ULL,
+        [](size_t acc, auto const& row) { return acc + row.size(); });
+
+    double const density =
+        static_cast<double>(nnz_top + nnz_bot)
+        / static_cast<double>(m_top_rows.size() + m_bottom_rows.size())
+        / static_cast<double>(m_mon_set.size()) * 100;
+
+    log::print(log::INFO2, "{:>10} x {:<9} {:>6.2f}%",
+               m_top_rows.size() + m_bottom_rows.size(), m_mon_set.size(),
+               density);
+    ::fflush(stdout);
 }
 
 void matrix_f4::symbolic_preprocessing(base_polynomial_basis const& basis)
@@ -232,6 +302,8 @@ void matrix_f4::symbolic_preprocessing(base_polynomial_basis const& basis)
 
         basis_monomial_vect_type const& mons_red = basis.monomials(reducer_idx);
         void_ptr_type const cfs_red = basis.v_coefficients(reducer_idx);
+
+        assert(cfs_red != nullptr);
 
         /* create multiplied poly. from reducer and insert it into the matrix */
         monomial_vect_type const& new_mons =
